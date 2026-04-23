@@ -1,0 +1,2123 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Musa AI - Master Control Cockpit v2.1</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+    <style>
+        /* CORE STYLING (unchanged) */
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #1a1c2c 0%, #4a192c 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            background: rgba(245, 247, 250, 0.98);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* HEADER & TABS */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 20px;
+        }
+
+        h1 {
+            margin: 0;
+            background: linear-gradient(45deg, #ff0055, #007bff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 2em;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            background: #e9ecef;
+            padding: 5px;
+            border-radius: 12px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            background: white;
+            color: #007bff;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        /* LAYOUT GRID */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        .main-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .side-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* CARDS & INPUTS */
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            border: 1px solid #eaeaea;
+            position: relative;
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #444;
+        }
+
+        .row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+
+        .col {
+            flex: 1;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 0.85em;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: 0.3s;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+
+        /* PRICE TAG BADGE */
+        .price-tag {
+            background: #e8f5e9;
+            color: #28a745;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: 800;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            border: 1px solid #c3e6cb;
+            margin-left: auto;
+        }
+
+        .price-tag.high-cost {
+            background: #fff3cd;
+            color: #856404;
+            border-color: #ffeeba;
+        }
+
+        /* FEATURE 1: CONTEXT TOGGLE */
+        .context-wrapper {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #6c757d;
+            transition: 0.3s;
+        }
+
+        .context-wrapper.active {
+            border-left-color: #28a745;
+            background: #e8f5e9;
+        }
+
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.toggle-slider {
+            background-color: #28a745;
+        }
+
+        input:checked+.toggle-slider:before {
+            transform: translateX(24px);
+        }
+
+        /* REFERENCE IMAGE URL */
+        .ref-image-url-wrapper {
+            margin-bottom: 15px;
+        }
+
+        /* Video-to-Video Options */
+        .v2v-options-wrapper {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+
+        .v2v-options-wrapper h3 {
+            margin-top: 0;
+        }
+
+        /* CHAPA STATUS BANNER */
+        .chapa-status-banner {
+            display: none;
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9em;
+            text-align: center;
+        }
+
+        .chapa-status-banner.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .chapa-status-banner.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .chapa-status-banner.failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* FEATURE 3: CHAPA CARD */
+        .chapa-card {
+            background: linear-gradient(135deg, #2D3436 0%, #000000 100%);
+            color: white;
+        }
+
+        .chapa-card h2,
+        .chapa-card label {
+            color: white;
+        }
+
+        .chapa-card input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid #444;
+            color: white;
+        }
+
+        .chapa-logo {
+            color: #00ff88;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        /* BUTTONS */
+        button {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+            transform: translateY(-2px);
+        }
+
+        .btn-chapa {
+            background: #00ff88;
+            color: #000;
+        }
+
+        .btn-chapa:hover {
+            background: #00cc6a;
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
+        }
+
+        .btn-template {
+            background: #6f42c1;
+            color: white;
+        }
+
+        .btn-template:hover {
+            background: #5a32a3;
+        }
+
+        /* LOGS CONSOLE */
+        #logs-container {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            height: 400px;
+            overflow-y: auto;
+            font-size: 12px;
+            border: 1px solid #333;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid #333;
+        }
+
+        .log-req {
+            color: #00ccff;
+        }
+
+        .log-res {
+            color: #00ff88;
+        }
+
+        .log-err {
+            color: #ff4444;
+        }
+
+        .log-sys {
+            color: #ffff00;
+        }
+
+        /* RESULTS */
+        #result-preview img {
+            width: 100%;
+            border-radius: 8px;
+            border: 2px solid #eee;
+            display: none;
+        }
+
+        /* SUPABASE CONFIG BAR */
+        .supabase-config-bar {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            background: linear-gradient(135deg, #1e293b, #334155);
+            padding: 14px 20px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+        }
+
+        .supabase-config-bar label {
+            font-size: 10px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .supabase-config-bar input {
+            width: 210px;
+            padding: 8px 10px;
+            font-size: 12px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid #475569;
+            color: #e2e8f0;
+            border-radius: 6px;
+        }
+
+        .supabase-config-bar input:focus {
+            border-color: #60a5fa;
+        }
+
+        .supabase-config-bar .cfg-btn {
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            width: auto;
+        }
+
+        .sb-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: auto;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        .sb-status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ef4444;
+        }
+
+        .sb-status-dot.connected {
+            background: #10b981;
+            box-shadow: 0 0 6px #10b981;
+        }
+
+        /* TEMPLATE IMAGE MANAGEMENT */
+        .tpl-images-section {
+            margin-top: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .tpl-images-section h3 {
+            margin: 0 0 16px 0;
+            color: #334155;
+            font-size: 1.05em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tpl-img-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .tpl-img-row label {
+            min-width: 110px;
+            font-weight: 600;
+            font-size: 0.8em;
+            color: #475569;
+            margin: 0;
+        }
+
+        .tpl-img-row input[type="text"] {
+            flex: 1;
+            min-width: 200px;
+            padding: 9px 12px;
+            font-size: 13px;
+            border: 2px solid #cbd5e1;
+            border-radius: 8px;
+        }
+
+        .tpl-img-row input[type="text"]:focus {
+            border-color: #6366f1;
+        }
+
+        .tpl-img-row .img-thumb {
+            width: 44px;
+            height: 44px;
+            border-radius: 8px;
+            object-fit: cover;
+            border: 2px solid #e2e8f0;
+            background: #e2e8f0;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .tpl-img-row .img-thumb:hover {
+            transform: scale(2.5);
+            z-index: 100;
+            position: relative;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .tpl-img-btn {
+            padding: 8px 14px !important;
+            font-size: 12px !important;
+            width: auto !important;
+            border-radius: 8px !important;
+            white-space: nowrap;
+        }
+
+        .btn-bucket {
+            background: linear-gradient(135deg, #8b5cf6, #6d28d9) !important;
+            color: white !important;
+        }
+
+        .btn-bucket:hover {
+            background: linear-gradient(135deg, #7c3aed, #5b21b6) !important;
+            transform: translateY(-1px);
+        }
+
+        .btn-save-img {
+            background: linear-gradient(135deg, #10b981, #059669) !important;
+            color: white !important;
+        }
+
+        .btn-save-img:hover {
+            background: linear-gradient(135deg, #059669, #047857) !important;
+            transform: translateY(-1px);
+        }
+
+        .tpl-img-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        /* GENERATED IMAGE REPLACE BUTTONS */
+        .gen-replace-bar {
+            margin-top: 12px;
+            padding: 14px;
+            background: linear-gradient(135deg, #eff6ff, #dbeafe);
+            border: 1px solid #93c5fd;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .gen-replace-bar.visible {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .gen-replace-bar p {
+            margin: 0 0 10px 0;
+            font-size: 0.85em;
+            font-weight: 600;
+            color: #1e40af;
+        }
+
+        .gen-replace-bar .replace-btns {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn-replace-before {
+            background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+            color: white !important;
+        }
+
+        .btn-replace-after {
+            background: linear-gradient(135deg, #06b6d4, #0891b2) !important;
+            color: white !important;
+        }
+
+        /* BUCKET PICKER MODAL */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 720px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 24px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 1.1em;
+        }
+
+        .modal-close {
+            background: rgba(255, 255, 255, 0.2) !important;
+            border: none;
+            color: white;
+            width: 36px !important;
+            height: 36px;
+            border-radius: 50% !important;
+            padding: 0 !important;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.3) !important;
+        }
+
+        .modal-body {
+            padding: 20px 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .bucket-search {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .bucket-search:focus {
+            border-color: #6366f1;
+            outline: none;
+        }
+
+        .bucket-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 12px;
+        }
+
+        .bucket-item {
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .bucket-item:hover {
+            border-color: #6366f1;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+        }
+
+        .bucket-item.selected {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+        }
+
+        .bucket-item img {
+            width: 100%;
+            height: 100px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .bucket-item-name {
+            padding: 6px 8px;
+            font-size: 11px;
+            color: #64748b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .modal-footer {
+            padding: 14px 24px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal-footer button {
+            width: auto !important;
+            padding: 10px 22px;
+        }
+
+        /* TOAST NOTIFICATIONS */
+        .toast {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            padding: 14px 24px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+            z-index: 2000;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s;
+            opacity: 0;
+            animation-fill-mode: forwards;
+        }
+
+        .toast.success {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+
+        .toast.error {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0;
+            }
+        }
+
+        .bucket-loading {
+            text-align: center;
+            padding: 40px;
+            color: #64748b;
+        }
+
+        .bucket-loading i {
+            font-size: 2em;
+            margin-bottom: 12px;
+            display: block;
+            color: #6366f1;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <div>
+                <h1>Musa AI Cockpit</h1>
+                <small style="color: #666;">Backend Verification & Testing Suite (v2.1)</small>
+            </div>
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('gen')"><i class="fas fa-wand-magic-sparkles"></i> 1.
+                    Generation</button>
+                <button class="tab" onclick="switchTab('temp')"><i class="fas fa-layer-group"></i> 2. Templates</button>
+                <button class="tab" onclick="switchTab('pay')"><i class="fas fa-credit-card"></i> 3.
+                    Chapa/Credits</button>
+                <button class="tab" onclick="switchTab('mod')"><i class="fas fa-server"></i> Models</button>
+            </div>
+        </header>
+
+        <!-- Supabase Config Bar -->
+        <div class="supabase-config-bar">
+            <div>
+                <label>Supabase URL</label>
+                <input type="text" id="sbUrl" placeholder="https://xyz.supabase.co">
+            </div>
+            <div>
+                <label>Anon Key</label>
+                <input type="password" id="sbAnonKey" placeholder="eyJ...">
+            </div>
+            <div>
+                <label>Service Role Key <span style="color:#fbbf24;font-size:9px;">(bypasses RLS)</span></label>
+                <input type="password" id="sbServiceKey" placeholder="eyJ... (service_role)">
+            </div>
+            <button class="btn-primary cfg-btn" onclick="saveAndConnectSupabase()">
+                <i class="fas fa-plug"></i> Connect
+            </button>
+            <div class="sb-status">
+                <span class="sb-status-dot" id="sbStatusDot"></span>
+                <span id="sbStatusText">Not connected</span>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+
+            <div class="main-panel">
+
+                <div id="genTab" class="tab-content active">
+                    <div class="card">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h2><i class="fas fa-brain"></i> Feature 1: Context-Aware Generation</h2>
+                            <div id="genPriceDisplay" class="price-tag">
+                                <i class="fas fa-coins"></i> <span>-- Credits</span>
+                            </div>
+                        </div>
+
+                        <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+
+                        <div class="row">
+                            <div class="col">
+                                <label>User UUID</label>
+                                <input type="text" id="genUserId" value="fc6f2b43-739c-4e8e-9e67-bd2389288922">
+                            </div>
+                            <div class="col">
+                                <label>Model Strategy</label>
+                                <select id="genModel" onchange="updateGenPrice()">
+                                    <option value="auto" data-price="5">⚡ Auto-Select (Standard)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="context-wrapper" id="contextWrapper">
+                            <div class="toggle-row">
+                                <div>
+                                    <strong><i class="fas fa-globe-africa"></i> Cultural Context Engine</strong>
+                                    <div style="font-size: 0.8em; color: #666;">Injects local knowledge into prompt
+                                    </div>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="contextToggle" onchange="toggleContextUI()">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+
+                            <div id="contextOptions" style="margin-top: 15px; display: none;">
+                                <div class="row">
+                                    <div class="col">
+                                        <label>Target Country</label>
+                                        <select id="countrySelect">
+                                            <option value="ET">Ethiopia (Addis Ababa)</option>
+                                            <option value="KE">Kenya (Nairobi)</option>
+                                            <option value="NG">Nigeria (Lagos)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col">
+                                        <label>Context Folder</label>
+                                        <select id="folderSelect">
+                                            <option value="cultural_traditions">Cultural Traditions</option>
+                                            <option value="modern_architecture">Modern Architecture</option>
+                                            <option value="street_life">Street Life</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <br>
+
+                        <label>User Prompt</label>
+                        <textarea id="genPrompt" rows="3"
+                            placeholder="e.g. A coffee ceremony in a modern living room...">A woman drinking coffee in a modern city</textarea>
+
+                        <!-- Reference Image URL -->
+                        <div class="ref-image-url-wrapper" style="margin-top:14px;">
+                            <label for="refImageUrl"><i class="fas fa-link"></i> Reference Image URL <span
+                                    style="font-weight:400;color:#999;">(optional — for models that accept a starting
+                                    image)</span></label>
+                            <input type="url" id="refImageUrl" placeholder="https://example.com/image.jpg">
+                        </div>
+
+                        <!-- NEW: Video-to-Video Options -->
+                        <div class="v2v-options-wrapper">
+                            <h3><i class="fas fa-film"></i> Video-to-Video Options</h3>
+
+                            <div class="row">
+                                <div class="col">
+                                    <label>Reference Video URL</label>
+                                    <input type="url" id="refVideoUrl" placeholder="https://example.com/video.mp4">
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col">
+                                    <label>Element Reference Image URL</label>
+                                    <input type="url" id="elementRefImage" placeholder="https://example.com/ref.jpg">
+                                </div>
+                                <div class="col">
+                                    <label>Element Frontal Image URL</label>
+                                    <input type="url" id="elementFrontalImage"
+                                        placeholder="https://example.com/frontal.jpg">
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col">
+                                    <label>Duration (seconds)</label>
+                                    <select id="v2vDuration">
+                                        <option value="5">5 seconds</option>
+                                        <option value="10">10 seconds</option>
+                                    </select>
+                                </div>
+                                <div class="col">
+                                    <label><input type="checkbox" id="keepAudio" checked> Keep Original Audio</label>
+                                </div>
+                            </div>
+                            <small style="color:#666;">For multi‑element support, use JSON in the prompt (e.g.,
+                                @Element1, @Element2).</small>
+                        </div>
+                        <!-- End Video-to-Video Options -->
+
+                        <div class="row">
+                            <div class="col">
+                                <label>Quality</label>
+                                <select id="genQuality" onchange="updateGenPrice()">
+                                    <option value="1K" data-mult="1">1K (Standard)</option>
+                                    <option value="2K" selected data-mult="1.5">2K (HD) [x1.5]</option>
+                                    <option value="4K" data-mult="2">4K (Ultra HD) [x2]</option>
+                                </select>
+                            </div>
+                            <div class="col">
+                                <label>Aspect Ratio</label>
+                                <select id="genAr">
+                                    <option>16:9</option>
+                                    <option>1:1</option>
+                                    <option>9:16</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button class="btn-primary" onclick="runGeneration()">Generate with Context</button>
+                    </div>
+                </div>
+
+                <!-- Templates, Chapa, Models tabs (unchanged) -->
+                <div id="tempTab" class="tab-content">
+                    <div class="card">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h2><i class="fas fa-file-code"></i> Feature 2: Creator Templates</h2>
+                            <div id="tplPriceDisplay" class="price-tag">
+                                <i class="fas fa-tag"></i> <span>-- Credits</span>
+                            </div>
+                        </div>
+
+                        <p style="font-size: 0.9em; color: #666; margin-bottom: 20px;">
+                            Simulates a user filling out a pre-made template. Price includes base model + creator fee.
+                        </p>
+
+                        <div class="row">
+                            <div class="col">
+                                <label>Select Template</label>
+                                <select id="tempSelect" onchange="onTemplateSelected()">
+                                    <option value="" disabled selected>Loading templates...</option>
+                                </select>
+                            </div>
+                            <div class="col">
+                                <label>Creator ID (Receives 30% Split)</label>
+                                <input type="text" id="creatorId" value="uuid-creator-001" disabled
+                                    style="background: #f0f0f0;">
+                            </div>
+                        </div>
+
+                        <!-- Template Image Management Section -->
+                        <div class="tpl-images-section" id="tplImagesSection" style="display:none;">
+                            <h3><i class="fas fa-images" style="color:#6366f1;"></i> Template Preview Images</h3>
+
+                            <div class="tpl-img-row">
+                                <label>Before Image</label>
+                                <img class="img-thumb" id="thumbBefore" src="" alt=""
+                                    onerror="this.style.display='none'"
+                                    onclick="this.src && window.open(this.src,'_blank')">
+                                <input type="text" id="tplBeforeUrl"
+                                    placeholder="Paste image URL or pick from bucket...">
+                                <button class="tpl-img-btn btn-bucket" onclick="openBucketPicker('before')">
+                                    <i class="fas fa-cloud-upload-alt"></i> From Bucket
+                                </button>
+                            </div>
+
+                            <div class="tpl-img-row">
+                                <label>After Image</label>
+                                <img class="img-thumb" id="thumbAfter" src="" alt="" onerror="this.style.display='none'"
+                                    onclick="this.src && window.open(this.src,'_blank')">
+                                <input type="text" id="tplAfterUrl"
+                                    placeholder="Paste image URL or pick from bucket...">
+                                <button class="tpl-img-btn btn-bucket" onclick="openBucketPicker('after')">
+                                    <i class="fas fa-cloud-upload-alt"></i> From Bucket
+                                </button>
+                            </div>
+
+                            <div class="tpl-img-actions">
+                                <button class="tpl-img-btn btn-save-img" onclick="saveImageUrls('both')">
+                                    <i class="fas fa-save"></i> Save Both URLs to DB
+                                </button>
+                                <button class="tpl-img-btn btn-save-img" onclick="saveImageUrls('before')"
+                                    style="background: linear-gradient(135deg,#f59e0b,#d97706)!important;">
+                                    <i class="fas fa-save"></i> Save Before Only
+                                </button>
+                                <button class="tpl-img-btn btn-save-img" onclick="saveImageUrls('after')"
+                                    style="background: linear-gradient(135deg,#06b6d4,#0891b2)!important;">
+                                    <i class="fas fa-save"></i> Save After Only
+                                </button>
+                            </div>
+                        </div>
+
+                        <div
+                            style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px dashed #ccc; margin-top: 16px;">
+                            <label><i class="fas fa-user-edit"></i> User Input Fields</label>
+                            <div id="templateFieldsContainer">
+                                <p style="color: #666; font-size: 0.9em;">Select a template to view fields.</p>
+                            </div>
+                        </div>
+
+                        <br>
+                        <button class="btn-template" onclick="runTemplateGen()">Generate from Template</button>
+
+                        <!-- Post-generation replace bar -->
+                        <div class="gen-replace-bar" id="genReplaceBar">
+                            <p><i class="fas fa-exchange-alt"></i> Replace template preview image with generated result:
+                            </p>
+                            <div class="tpl-img-row" style="margin-bottom:8px;">
+                                <label style="min-width:80px;">Gen URL</label>
+                                <input type="text" id="genResultUrlField" readonly style="background:#f1f5f9;">
+                            </div>
+                            <div class="replace-btns">
+                                <button class="tpl-img-btn btn-replace-before" onclick="replaceFromGenerated('before')">
+                                    <i class="fas fa-arrow-left"></i> Replace Before Image
+                                </button>
+                                <button class="tpl-img-btn btn-replace-after" onclick="replaceFromGenerated('after')">
+                                    <i class="fas fa-arrow-right"></i> Replace After Image
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="payTab" class="tab-content">
+                    <div class="card chapa-card">
+                        <h2><span class="chapa-logo">Chapa</span> // Token Recharge</h2>
+                        <p style="color: #ccc;">Initiates a real Chapa payment &amp; polls for confirmation
+                            automatically.</p>
+
+                        <div class="row">
+                            <div class="col">
+                                <label>User UUID</label>
+                                <input type="text" id="payUserId" value="fc6f2b43-739c-4e8e-9e67-bd2389288922">
+                            </div>
+                            <div class="col">
+                                <label>Email (required by Chapa)</label>
+                                <input type="email" id="payEmail" placeholder="user@example.com" value="test@musa.ai">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col">
+                                <label>Amount (ETB) <span style="font-weight:400;color:#aaa;">min 10, max 10
+                                        000</span></label>
+                                <input type="number" id="payAmount" value="100" min="10" max="10000">
+                            </div>
+                            <div class="col">
+                                <label>Token Equivalent</label>
+                                <input type="text" id="payCreditsDisplay" value="1000 Credits" disabled
+                                    style="color: #00ff88;">
+                            </div>
+                        </div>
+
+                        <button class="btn-chapa" id="chapaBtn" onclick="runChapaTopUp()">
+                            <i class="fas fa-bolt"></i> Pay with Chapa
+                        </button>
+
+                        <div id="chapaStatusBanner" class="chapa-status-banner"></div>
+                    </div>
+
+                    <div class="card" style="margin-top: 20px;">
+                        <h2><i class="fas fa-wallet"></i> Wallet State Check</h2>
+                        <button class="secondary" onclick="checkBalance()"
+                            style="background: #e9ecef; color: #333;">Check Current Balance</button>
+                        <div id="balanceDisplay" style="margin-top: 10px; font-size: 1.5em; font-weight: bold;">--</div>
+                    </div>
+                </div>
+
+                <div id="modTab" class="tab-content">
+                    <div class="card">
+                        <h2>Available Gated Models</h2>
+                        <button onclick="fetchModels()" class="btn-primary" style="margin-bottom: 10px;">Refresh
+                            List</button>
+                        <div id="modelList"
+                            style="font-family: monospace; font-size: 0.9em; max-height: 300px; overflow-y: auto;">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="side-panel">
+                <div class="card" style="flex: 1; display: flex; flex-direction: column;">
+                    <h2><i class="fas fa-terminal"></i> Gatekeeper Logs</h2>
+                    <div id="logs-container">
+                        <div class="log-entry log-sys">[SYSTEM] Cockpit v2.1 Initialized</div>
+                        <div class="log-entry log-sys">[SYSTEM] Real-time pricing engine active</div>
+                    </div>
+                    <button onclick="document.getElementById('logs-container').innerHTML=''"
+                        style="margin-top: 10px; background: #333; color: white; padding: 8px;">Clear Logs</button>
+                </div>
+
+                <div class="card" id="result-preview">
+                    <h2><i class="fas fa-eye"></i> Live Preview</h2>
+                    <div id="loading" style="display:none; text-align: center; padding: 20px;">
+                        <i class="fas fa-circle-notch fa-spin fa-2x" style="color: #007bff"></i>
+                        <p>Processing...</p>
+                    </div>
+                    <img id="resultImg" src="" alt="Result">
+                    <div id="resultMeta" style="margin-top: 10px; font-size: 0.8em; color: #666;"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Bucket Picker Modal -->
+    <div class="modal-overlay" id="bucketModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-cloud"></i> Select Image from Bucket</h3>
+                <button class="modal-close" onclick="closeBucketPicker()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="text" class="bucket-search" id="bucketSearch" placeholder="Search images..."
+                    oninput="filterBucketImages()">
+                <div class="bucket-grid" id="bucketGrid">
+                    <div class="bucket-loading">
+                        <i class="fas fa-circle-notch fa-spin"></i>
+                        Loading images from bucket...
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button style="background:#e2e8f0; color:#334155;" onclick="closeBucketPicker()">Cancel</button>
+                <button class="btn-primary" id="bucketSelectBtn" onclick="confirmBucketSelection()" disabled>Select
+                    Image</button>
+            </div>
+        </div>
+    </div>
+
+    </div>
+
+    <script>
+        const API_URL = "http://127.0.0.1:8000/api/v1";
+
+        // ======================== SUPABASE CLIENT ========================
+        let supabaseClient = null;
+        let supabaseAdminClient = null;
+        function adminClient() { return supabaseAdminClient || supabaseClient; }
+
+        function isSupabaseLoaded() {
+            return typeof window.supabase !== 'undefined' && typeof window.supabase.createClient === 'function';
+        }
+
+        function updateSbStatus(connected, msg) {
+            const dot = document.getElementById('sbStatusDot');
+            const text = document.getElementById('sbStatusText');
+            if (connected) {
+                dot.classList.add('connected');
+                text.innerText = msg || 'Connected';
+            } else {
+                dot.classList.remove('connected');
+                text.innerText = msg || 'Not connected';
+            }
+        }
+
+        async function initSupabaseClient() {
+            const url = document.getElementById('sbUrl').value.trim();
+            const anonKey = document.getElementById('sbAnonKey').value.trim();
+            const serviceKey = document.getElementById('sbServiceKey').value.trim();
+            if (!url || !anonKey) {
+                log('err', 'Supabase URL and Anon Key are required');
+                updateSbStatus(false, 'Missing credentials');
+                return false;
+            }
+            if (!isSupabaseLoaded()) {
+                log('err', 'Supabase JS library not loaded. Check internet.');
+                return false;
+            }
+            try {
+                supabaseClient = window.supabase.createClient(url, anonKey);
+                if (serviceKey) supabaseAdminClient = window.supabase.createClient(url, serviceKey);
+                else supabaseAdminClient = null;
+                // Quick connection test
+                const { error } = await adminClient().from('creator_templates').select('id').limit(1);
+                if (error) throw error;
+                updateSbStatus(true, 'Connected');
+                log('sys', 'Supabase connection established');
+                return true;
+            } catch (err) {
+                log('err', `Supabase init error: ${err.message}`);
+                updateSbStatus(false, 'Connection failed');
+                return false;
+            }
+        }
+
+        function saveAndConnectSupabase() {
+            const url = document.getElementById('sbUrl').value.trim();
+            const anonKey = document.getElementById('sbAnonKey').value.trim();
+            const serviceKey = document.getElementById('sbServiceKey').value.trim();
+            if (!url || !anonKey) { log('err', 'Enter Supabase URL and Anon Key'); return; }
+            localStorage.setItem('supabase_url', url);
+            localStorage.setItem('supabase_anon_key', anonKey);
+            if (serviceKey) localStorage.setItem('supabase_service_key', serviceKey);
+            else localStorage.removeItem('supabase_service_key');
+            initSupabaseClient();
+        }
+
+        function loadSavedSupabaseConfig() {
+            const url = localStorage.getItem('supabase_url');
+            const anonKey = localStorage.getItem('supabase_anon_key');
+            const serviceKey = localStorage.getItem('supabase_service_key');
+            if (url) document.getElementById('sbUrl').value = url;
+            if (anonKey) document.getElementById('sbAnonKey').value = anonKey;
+            if (serviceKey) document.getElementById('sbServiceKey').value = serviceKey;
+            if (url && anonKey) {
+                initSupabaseClient();
+            }
+        }
+
+        // ======================== TOAST NOTIFICATIONS ========================
+        function showToast(message, type = 'success') {
+            const existing = document.querySelectorAll('.toast');
+            existing.forEach(t => t.remove());
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> ${message}`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // ======================== TEMPLATE IMAGE MANAGEMENT ========================
+        let bucketPickerTarget = null; // 'before' or 'after'
+        let bucketImages = [];
+        let selectedBucketUrl = null;
+        let lastGeneratedUrl = null;
+
+        function showTemplateImages(template) {
+            const section = document.getElementById('tplImagesSection');
+            section.style.display = 'block';
+
+            const beforeUrl = template.before_image_url || '';
+            const afterUrl = template.after_image_url || '';
+
+            document.getElementById('tplBeforeUrl').value = beforeUrl;
+            document.getElementById('tplAfterUrl').value = afterUrl;
+
+            const thumbBefore = document.getElementById('thumbBefore');
+            const thumbAfter = document.getElementById('thumbAfter');
+
+            if (beforeUrl) {
+                thumbBefore.src = beforeUrl;
+                thumbBefore.style.display = 'block';
+            } else {
+                thumbBefore.src = '';
+                thumbBefore.style.display = 'none';
+            }
+            if (afterUrl) {
+                thumbAfter.src = afterUrl;
+                thumbAfter.style.display = 'block';
+            } else {
+                thumbAfter.src = '';
+                thumbAfter.style.display = 'none';
+            }
+        }
+
+        // Live thumbnail preview on input change
+        document.addEventListener('DOMContentLoaded', () => {
+            ['tplBeforeUrl', 'tplAfterUrl'].forEach(id => {
+                const input = document.getElementById(id);
+                if (!input) return;
+                input.addEventListener('input', () => {
+                    const thumbId = id === 'tplBeforeUrl' ? 'thumbBefore' : 'thumbAfter';
+                    const thumb = document.getElementById(thumbId);
+                    if (input.value.trim()) {
+                        thumb.src = input.value.trim();
+                        thumb.style.display = 'block';
+                    } else {
+                        thumb.src = '';
+                        thumb.style.display = 'none';
+                    }
+                });
+            });
+        });
+
+        async function saveImageUrls(which) {
+            if (!adminClient()) { showToast('Connect to Supabase first', 'error'); return; }
+            const tplId = document.getElementById('tempSelect').value;
+            if (!tplId) { showToast('Select a template first', 'error'); return; }
+
+            const update = {};
+            if (which === 'before' || which === 'both') {
+                update.before_image_url = document.getElementById('tplBeforeUrl').value.trim() || null;
+            }
+            if (which === 'after' || which === 'both') {
+                update.after_image_url = document.getElementById('tplAfterUrl').value.trim() || null;
+            }
+
+            log('req', `Updating creator_templates.${which} for template ${tplId}`);
+            const { error } = await adminClient().from('creator_templates').update(update).eq('id', tplId);
+            if (error) {
+                log('err', `Update failed: ${error.message}`);
+                showToast(`Save failed: ${error.message}`, 'error');
+            } else {
+                log('res', `Image URL(s) saved successfully`);
+                showToast('Image URL(s) saved to DB!');
+                // Refresh the template in our local cache
+                const tpl = currentTemplates.find(t => t.id === tplId);
+                if (tpl) {
+                    if (update.before_image_url !== undefined) tpl.before_image_url = update.before_image_url;
+                    if (update.after_image_url !== undefined) tpl.after_image_url = update.after_image_url;
+                }
+            }
+        }
+
+        async function replaceFromGenerated(which) {
+            const url = document.getElementById('genResultUrlField').value;
+            if (!url) { showToast('No generated URL available', 'error'); return; }
+            if (which === 'before') {
+                document.getElementById('tplBeforeUrl').value = url;
+                document.getElementById('thumbBefore').src = url;
+                document.getElementById('thumbBefore').style.display = 'block';
+            } else {
+                document.getElementById('tplAfterUrl').value = url;
+                document.getElementById('thumbAfter').src = url;
+                document.getElementById('thumbAfter').style.display = 'block';
+            }
+            await saveImageUrls(which);
+        }
+
+        // ======================== BUCKET PICKER ========================
+        function openBucketPicker(target) {
+            if (!adminClient()) { showToast('Connect to Supabase first', 'error'); return; }
+            bucketPickerTarget = target;
+            selectedBucketUrl = null;
+            document.getElementById('bucketSelectBtn').disabled = true;
+            document.getElementById('bucketSearch').value = '';
+            document.getElementById('bucketModal').classList.add('open');
+            loadBucketImages();
+        }
+
+        function closeBucketPicker() {
+            document.getElementById('bucketModal').classList.remove('open');
+        }
+
+        async function loadBucketImages() {
+            const grid = document.getElementById('bucketGrid');
+            grid.innerHTML = '<div class="bucket-loading"><i class="fas fa-circle-notch fa-spin"></i>Loading images from user-uploads bucket...</div>';
+
+            try {
+                bucketImages = await fetchBucketFiles('');
+                log('sys', `Loaded ${bucketImages.length} images from user-uploads bucket`);
+                renderBucketGrid(bucketImages);
+            } catch (err) {
+                grid.innerHTML = `<div class="bucket-loading" style="color:#ef4444;">
+                    <i class="fas fa-exclamation-triangle"></i><br>
+                    <strong>Error listing bucket:</strong> ${err.message}<br>
+                    <small style="color:#94a3b8;margin-top:8px;display:block;">
+                        Ensure bucket <code>user-uploads</code> exists and the Service Role Key is set.
+                    </small>
+                </div>`;
+                log('err', `Bucket load error: ${err.message}`);
+            }
+        }
+
+        /**
+         * Recursively fetch all image files from a Supabase Storage bucket path.
+         * Handles sub-folders (e.g. user123/image.jpg) by detecting entries where id===null (folders).
+         * @param {string} path - folder path to list ('' = root)
+         * @returns {Promise<Array<{name: string, path: string, url: string}>>}
+         */
+        async function fetchBucketFiles(path) {
+            const BUCKET = 'user-uploads';
+            const client = adminClient();
+
+            log('sys', `Listing bucket path: "${path || '(root)'}"...`);
+
+            const { data: entries, error } = await client.storage.from(BUCKET).list(path, {
+                limit: 500,
+                offset: 0,
+                sortBy: { column: 'name', order: 'asc' }
+            });
+
+            if (error) {
+                log('err', `Storage list error at "${path}": ${error.message} (${error.statusCode || ''})`);
+                throw error;
+            }
+
+            log('sys', `  → Found ${(entries || []).length} entries at "${path || 'root'}": ${(entries || []).map(e => e.name + (e.id ? '' : '/')).join(', ')}`);
+            console.log(`[Bucket] Raw entries at "${path}":`, entries);
+
+            const imageExtensions = /\.(jpg|jpeg|png|webp|gif|avif)$/i;
+            const results = [];
+
+            for (const entry of (entries || [])) {
+                if (!entry || entry.name.startsWith('.')) continue;
+
+                const fullPath = path ? `${path}/${entry.name}` : entry.name;
+
+                if (entry.id === null) {
+                    // This is a folder — recurse into it
+                    try {
+                        const nested = await fetchBucketFiles(fullPath);
+                        results.push(...nested);
+                    } catch (folderErr) {
+                        log('err', `Failed to list subfolder "${fullPath}": ${folderErr.message}`);
+                    }
+                } else if (imageExtensions.test(entry.name)) {
+                    // It's an image file
+                    const { data: urlData } = client.storage.from(BUCKET).getPublicUrl(fullPath);
+                    results.push({
+                        name: entry.name,
+                        path: fullPath,
+                        url: urlData.publicUrl
+                    });
+                }
+            }
+
+            return results;
+        }
+
+        function renderBucketGrid(images) {
+            const grid = document.getElementById('bucketGrid');
+            if (images.length === 0) {
+                grid.innerHTML = '<div class="bucket-loading">No images found in the bucket.</div>';
+                return;
+            }
+            grid.innerHTML = '';
+            images.forEach(img => {
+                const item = document.createElement('div');
+                item.className = 'bucket-item';
+                item.dataset.url = img.url;
+                const displayName = img.path || img.name;
+                item.innerHTML = `<img src="${img.url}" alt="${img.name}" loading="lazy"><div class="bucket-item-name" title="${displayName}">${img.name}</div>`;
+                item.onclick = () => selectBucketImage(item, img.url);
+                grid.appendChild(item);
+            });
+        }
+
+        function selectBucketImage(element, url) {
+            document.querySelectorAll('.bucket-item.selected').forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+            selectedBucketUrl = url;
+            document.getElementById('bucketSelectBtn').disabled = false;
+        }
+
+        function filterBucketImages() {
+            const query = document.getElementById('bucketSearch').value.toLowerCase();
+            const filtered = bucketImages.filter(img =>
+                (img.path || img.name).toLowerCase().includes(query)
+            );
+            renderBucketGrid(filtered);
+        }
+
+        function confirmBucketSelection() {
+            if (!selectedBucketUrl) return;
+
+            // Check if target is 'before', 'after', or a dynamic field ID
+            if (bucketPickerTarget === 'before') {
+                document.getElementById('tplBeforeUrl').value = selectedBucketUrl;
+                document.getElementById('thumbBefore').src = selectedBucketUrl;
+                document.getElementById('thumbBefore').style.display = 'block';
+            } else if (bucketPickerTarget === 'after') {
+                document.getElementById('tplAfterUrl').value = selectedBucketUrl;
+                document.getElementById('thumbAfter').src = selectedBucketUrl;
+                document.getElementById('thumbAfter').style.display = 'block';
+            } else {
+                // Must be a dynamic field
+                const fieldEl = document.getElementById(bucketPickerTarget);
+                if (fieldEl) {
+                    fieldEl.value = selectedBucketUrl;
+                }
+            }
+
+            log('sys', `Selected bucket image for ${bucketPickerTarget}: ${selectedBucketUrl}`);
+            closeBucketPicker();
+        }
+
+
+        // --- UI LOGIC ---
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        function updateGenPrice() {
+            const modelSelect = document.getElementById('genModel');
+            const qualitySelect = document.getElementById('genQuality');
+            const display = document.getElementById('genPriceDisplay');
+
+            const basePrice = parseFloat(modelSelect.options[modelSelect.selectedIndex]?.getAttribute('data-price') || 5);
+            const qualityMult = parseFloat(qualitySelect.options[qualitySelect.selectedIndex].getAttribute('data-mult'));
+
+            const total = (basePrice * qualityMult).toFixed(1);
+
+            display.innerHTML = `<i class="fas fa-coins"></i> <span>${total} Credits</span>`;
+
+            if (total > 50) {
+                display.classList.add('high-cost');
+            } else {
+                display.classList.remove('high-cost');
+            }
+        }
+
+        // template logic moved to dynamic loading
+
+        function toggleContextUI() {
+            const wrapper = document.getElementById('contextWrapper');
+            const options = document.getElementById('contextOptions');
+            const isChecked = document.getElementById('contextToggle').checked;
+
+            if (isChecked) {
+                wrapper.classList.add('active');
+                options.style.display = 'block';
+                log("sys", "Context Tuner Activated: Country options loaded");
+            } else {
+                wrapper.classList.remove('active');
+                options.style.display = 'none';
+                log("sys", "Context Tuner Deactivated: Standard generation");
+            }
+        }
+
+        function log(type, msg) {
+            const container = document.getElementById('logs-container');
+            const div = document.createElement('div');
+            div.className = `log-entry log-${type}`;
+            const time = new Date().toLocaleTimeString();
+            div.innerText = `[${time}] ${msg}`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // --- REFERENCE IMAGE URL HELPER ---
+        function getRefImageUrl() {
+            return document.getElementById('refImageUrl').value.trim() || null;
+        }
+
+        // --- BACKEND INTERACTIONS ---
+
+        async function runGeneration() {
+            const prompt = document.getElementById('genPrompt').value;
+            const contextOn = document.getElementById('contextToggle').checked;
+            const refUrl = getRefImageUrl();
+            const refVideoUrl = document.getElementById('refVideoUrl').value.trim() || null;
+            const elementRefImage = document.getElementById('elementRefImage').value.trim() || null;
+            const elementFrontalImage = document.getElementById('elementFrontalImage').value.trim() || null;
+            const v2vDuration = document.getElementById('v2vDuration').value;
+            const keepAudio = document.getElementById('keepAudio').checked;
+
+            const payload = {
+                user_id: document.getElementById('genUserId').value,
+                prompt: prompt,
+                model_id: document.getElementById('genModel').value,
+                quality: document.getElementById('genQuality').value,
+                context_toggle: contextOn,
+                country_code: contextOn ? document.getElementById('countrySelect').value : null,
+            };
+
+            if (refUrl) {
+                payload.image_url = refUrl;
+                payload.start_image_url = refUrl;
+                log('sys', `Sending with reference image URL: ${refUrl}`);
+            }
+            if (refVideoUrl) {
+                payload.video_url = refVideoUrl;
+                log('sys', `Sending with reference video URL: ${refVideoUrl}`);
+            }
+            if (elementRefImage && elementFrontalImage) {
+                // Build elements array as expected by fal.ai
+                payload.elements = [{
+                    reference_image_urls: [elementRefImage],
+                    frontal_image_url: elementFrontalImage
+                }];
+                log('sys', `Sending element: ref=${elementRefImage}, frontal=${elementFrontalImage}`);
+            }
+            if (v2vDuration) {
+                payload.duration = v2vDuration;
+            }
+            if (keepAudio !== undefined) {
+                payload.keep_audio = keepAudio;
+            }
+
+            log("req", `POST /generate | Context: ${contextOn}`);
+            log("req", `Prompt: "${prompt.substring(0, 30)}..."`);
+
+            await sendGenerationRequest(payload);
+        }
+
+        let currentTemplateId = null;
+        let currentTemplates = [];
+        let templateFieldsData = [];
+
+        async function fetchTemplates() {
+            try {
+                log("req", "GET /templates (all, including drafts)");
+                const response = await fetch(`${API_URL}/templates`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                // Backend returns { status: "success", templates: [...] }
+                const templates = data.templates || data;
+                if (!Array.isArray(templates)) {
+                    log("err", "Templates data is not an array");
+                    return;
+                }
+                currentTemplates = templates;
+                const select = document.getElementById("tempSelect");
+                if (!select) {
+                    log("err", "Dropdown #tempSelect not found");
+                    return;
+                }
+                select.innerHTML = '<option value="">Select a template</option>';
+                templates.forEach(tpl => {
+                    const option = document.createElement("option");
+                    option.value = tpl.id;
+                    // Prefix drafts so admin can identify unpublished templates
+                    option.textContent = tpl.is_published === false
+                        ? `[DRAFT] ${tpl.title}`
+                        : tpl.title;
+                    select.appendChild(option);
+                });
+                const published = templates.filter(t => t.is_published !== false).length;
+                const drafts = templates.length - published;
+                log("sys", `Loaded ${templates.length} templates (${published} published, ${drafts} drafts)`);
+            } catch (err) {
+                log("err", `Failed to load templates: ${err.message}`);
+                const select = document.getElementById('tempSelect');
+                if (select) select.innerHTML = '<option value="" disabled>Error loading templates</option>';
+            }
+        }
+
+        async function onTemplateSelected() {
+            const tplId = document.getElementById('tempSelect').value;
+            currentTemplateId = tplId;
+            const container = document.getElementById('templateFieldsContainer');
+
+            // Update price display if template found
+            const template = currentTemplates.find(t => t.id === tplId);
+            const priceDisplay = document.getElementById('tplPriceDisplay');
+            if (template) {
+                const base = template.base_price_tokens || template.price_tokens || 0;
+                let creatorFee = 0;
+                if (template.revenue_split) {
+                    try {
+                        const split = typeof template.revenue_split === 'string' ? JSON.parse(template.revenue_split) : template.revenue_split;
+                        creatorFee = (split.creator || 0) * base;
+                    } catch (e) { console.warn("Failed to parse revenue_split", e); }
+                }
+                const total = base + creatorFee;
+                priceDisplay.innerHTML = `<i class="fas fa-tag"></i> <span>${total.toFixed(1)} Credits (Includes ${creatorFee.toFixed(1)} creator fee)</span>`;
+                // Show image management section
+                showTemplateImages(template);
+            } else {
+                priceDisplay.innerHTML = `<i class="fas fa-tag"></i> <span>-- Credits</span>`;
+                document.getElementById('tplImagesSection').style.display = 'none';
+            }
+
+            // Hide the replace bar when switching templates
+            document.getElementById('genReplaceBar').classList.remove('visible');
+
+            container.innerHTML = '<p style="color: #666;"><i class="fas fa-spinner fa-spin"></i> Loading fields...</p>';
+            log("req", `GET /templates/${tplId}/fields`);
+
+            try {
+                const res = await fetch(`${API_URL}/templates/${tplId}/fields`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                // Backend returns { status: "success", fields: [...] }
+                const fields = data.fields || data;
+                if (!Array.isArray(fields)) {
+                    throw new Error("Fields data is not an array");
+                }
+                templateFieldsData = fields;
+
+                container.innerHTML = '';
+                if (fields.length === 0) {
+                    container.innerHTML = '<p style="color: #666;">No fields available for this template.</p>';
+                    return;
+                }
+
+                let fieldsHtml = "";
+                fields.forEach(field => {
+                    fieldsHtml += renderField(field);
+                });
+                container.innerHTML = fieldsHtml;
+
+                log("res", `Loaded ${fields.length} fields`);
+            } catch (err) {
+                log("err", `Failed to load fields: ${err.message}`);
+                container.innerHTML = '<p style="color: red;">Error loading fields.</p>';
+            }
+        }
+
+        function renderField(field) {
+            let html = `<div class="row" style="margin-bottom: 15px;"><div class="col">`;
+            html += `<label>${field.field_label || field.field_name} ${field.is_required ? '<span style="color:red">*</span>' : ''}</label>`;
+
+            // Use field_name to create a unique, stable ID
+            const fieldId = `field_${field.field_name}`;
+
+            if (field.field_type === 'select') {
+                html += `<select id="${fieldId}" ${field.is_required ? 'required' : ''}>`;
+                if (field.options && Array.isArray(field.options)) {
+                    field.options.forEach(opt => {
+                        html += `<option value="${opt}">${opt}</option>`;
+                    });
+                } else if (typeof field.options === 'string') {
+                    field.options.split(',').map(s => s.trim()).forEach(opt => {
+                        if (opt) html += `<option value="${opt}">${opt}</option>`;
+                    });
+                }
+                html += `</select>`;
+            } else if (field.field_type === 'toggle') {
+                html += `<select id="${fieldId}">
+                    <option value="true">Yes/On</option>
+                    <option value="false">No/Off</option>
+                 </select>`;
+            } else if (field.field_type === 'file') {
+                html += `
+                <div style="display:flex; gap:10px; margin-bottom: 4px;">
+                    <input type="url" id="${fieldId}" placeholder="https://example.com/image.jpg" ${field.is_required ? 'required' : ''}>
+                    <button type="button" class="tpl-img-btn btn-bucket" onclick="openBucketPicker('${fieldId}')">
+                        <i class="fas fa-folder-open"></i> Bucket
+                    </button>
+                </div>
+                <small style="color: #666;">(Public URL for reference image)</small>`;
+            } else {
+                html += `<input type="text" id="${fieldId}" placeholder="Enter ${field.field_label || field.field_name}" ${field.is_required ? 'required' : ''}>`;
+            }
+
+            html += `</div></div>`;
+            return html;
+        }
+
+        function collectTemplateData() {
+            const values = {};
+            let imageUrl = null;
+
+            templateFieldsData.forEach(field => {
+                const fieldId = `field_${field.field_name}`;
+                const el = document.getElementById(fieldId);
+                if (el) {
+                    let val = el.value;
+                    if (field.field_type === 'file' && val && !imageUrl) {
+                        imageUrl = val;
+                    }
+                    // Use field_name as the key to replace placeholders
+                    values[field.field_name] = val;
+                }
+            });
+
+            return { values, imageUrl };
+        }
+
+        async function runTemplateGen() {
+            const tplId = document.getElementById('tempSelect').value;
+            if (!tplId) {
+                log('err', 'Please select a template first');
+                return;
+            }
+
+            const template = currentTemplates.find(t => t.id === tplId);
+            if (!template) {
+                log('err', 'Template not found');
+                return;
+            }
+
+            const { values, imageUrl: userImageUrl } = collectTemplateData();
+
+            // Build prompt by replacing placeholders
+            let promptText = template.prompt_template || template.hidden_system_prompt || "";
+            for (const [key, val] of Object.entries(values)) {
+                const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+                promptText = promptText.replace(regex, val);
+            }
+
+            // Collect all images: hidden images from template, then user file (if any)
+            const allImageUrls = [];
+            if (template.hidden_image_urls && Array.isArray(template.hidden_image_urls)) {
+                allImageUrls.push(...template.hidden_image_urls);
+            }
+            if (userImageUrl) {
+                allImageUrls.push(userImageUrl);
+            }
+
+            // First image becomes main reference, rest become context images
+            let mainImageUrl = null;
+            let contextImages = [];
+            if (allImageUrls.length > 0) {
+                mainImageUrl = allImageUrls[0];
+                contextImages = allImageUrls.slice(1);
+            }
+
+            const contextOn = document.getElementById('contextToggle').checked;
+
+            const payload = {
+                user_id: document.getElementById('genUserId').value,
+                template_id: tplId,
+                creator_id: document.getElementById('creatorId').value,
+                prompt: promptText,
+                model_id: document.getElementById('genModel').value || "auto",
+                quality: document.getElementById('genQuality').value || "2K",
+                aspect_ratio: document.getElementById('genAr').value || "16:9",
+                context_toggle: contextOn,
+                country_code: contextOn ? document.getElementById('countrySelect').value : null,
+            };
+
+            if (mainImageUrl) {
+                payload.image_url = mainImageUrl;
+                payload.start_image_url = mainImageUrl; // for fal.ai compatibility
+            }
+            if (contextImages.length > 0) {
+                payload.context_images = contextImages;
+            }
+
+            log("req", `POST /generate | Template: ${tplId}`);
+            log("req", `Rendered Prompt: "${promptText.substring(0, 50)}..."`);
+            if (mainImageUrl) log("sys", `Main image: ${mainImageUrl}`);
+            if (contextImages.length) log("sys", `+ ${contextImages.length} context image(s)`);
+            log("sys", `Creator Fee Calculation: Active`);
+
+            await sendGenerationRequest(payload);
+        }
+
+        async function sendGenerationRequest(payload) {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('resultImg').style.display = 'none';
+
+            try {
+                const endpoint = `${API_URL}/generate`;
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const data = await response.json();
+
+                log("res", `Success! Cost: ${data.cost || 'N/A'} Credits`);
+                if (data.provider) log("sys", `Routed to: ${data.provider}`);
+
+                if (data.url || data.image_url) {
+                    const url = data.url || data.image_url;
+                    document.getElementById('resultImg').src = url;
+                    document.getElementById('resultImg').style.display = 'block';
+                    document.getElementById('resultMeta').innerText = `Model: ${data.model_id} | Cost: ${data.cost}`;
+
+                    // Show replace bar if a template is selected
+                    if (currentTemplateId) {
+                        lastGeneratedUrl = url;
+                        document.getElementById('genResultUrlField').value = url;
+                        document.getElementById('genReplaceBar').classList.add('visible');
+                    }
+                } else {
+                    log("err", "No image URL in response");
+                }
+
+            } catch (err) {
+                log("err", `Generation Failed: ${err.message}`);
+                console.error(err);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        document.getElementById('payAmount').addEventListener('input', function () {
+            const etb = parseInt(this.value) || 0;
+            document.getElementById('payCreditsDisplay').value = (etb * 10) + ' Credits';
+        });
+
+        async function runChapaTopUp() {
+            const userId = document.getElementById('payUserId').value.trim();
+            const email = document.getElementById('payEmail').value.trim();
+            const amountEtb = parseInt(document.getElementById('payAmount').value);
+
+            if (!userId || !email) { log('err', 'User ID and Email are required'); return; }
+            if (!amountEtb || amountEtb < 10) { log('err', 'Minimum amount is 10 ETB'); return; }
+
+            const btn = document.getElementById('chapaBtn');
+            const banner = document.getElementById('chapaStatusBanner');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Initiating...';
+            banner.style.display = 'none';
+            banner.className = 'chapa-status-banner';
+
+            log('req', `POST /chapa/initiate | ETB: ${amountEtb}`);
+
+            let tx_ref;
+            try {
+                const res = await fetch(`${API_URL}/chapa/initiate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        amount_etb: amountEtb,
+                        email: email,
+                        callback_url: `${API_URL}/chapa/verify`
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+
+                tx_ref = data.tx_ref;
+                const checkoutUrl = data.checkout_url;
+
+                log('res', `Payment initiated. tx_ref: ${tx_ref}`);
+                log('sys', `Opening Chapa checkout...`);
+
+                window.open(checkoutUrl, '_blank');
+
+                banner.style.display = 'block';
+                banner.className = 'chapa-status-banner pending';
+                banner.innerHTML = `<i class="fas fa-clock"></i> Waiting for payment confirmation... (tx_ref: <code>${tx_ref}</code>)`;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Polling...';
+
+            } catch (err) {
+                log('err', `Initiation failed: ${err.message}`);
+                banner.style.display = 'block';
+                banner.className = 'chapa-status-banner failed';
+                banner.innerHTML = `<i class="fas fa-times-circle"></i> Failed to initiate: ${err.message}`;
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-bolt"></i> Pay with Chapa';
+                return;
+            }
+
+            const maxPolls = 100;
+            let polls = 0;
+            const pollInterval = setInterval(async () => {
+                polls++;
+                if (polls > maxPolls) {
+                    clearInterval(pollInterval);
+                    log('err', 'Payment verification timed out');
+                    banner.className = 'chapa-status-banner failed';
+                    banner.innerHTML = '<i class="fas fa-times-circle"></i> Verification timed out. Check your balance manually.';
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-bolt"></i> Pay with Chapa';
+                    return;
+                }
+
+                try {
+                    const vRes = await fetch(`${API_URL}/chapa/verify/${tx_ref}`);
+                    const vData = await vRes.json();
+                    log('sys', `Poll ${polls}: status = ${vData.status}`);
+
+                    if (vData.status === 'success') {
+                        clearInterval(pollInterval);
+                        const credits = vData.credits_added || (amountEtb * 10);
+                        banner.className = 'chapa-status-banner success';
+                        banner.innerHTML = `<i class="fas fa-check-circle"></i> Payment confirmed! +${credits} Credits added.`;
+                        log('res', `Chapa payment SUCCESS: +${credits} credits. New balance: ${vData.new_balance || '--'}`);
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-bolt"></i> Pay with Chapa';
+                        await checkBalance();
+                    } else if (vData.status === 'failed') {
+                        clearInterval(pollInterval);
+                        banner.className = 'chapa-status-banner failed';
+                        banner.innerHTML = '<i class="fas fa-times-circle"></i> Payment failed or was cancelled.';
+                        log('err', `Chapa payment FAILED for tx_ref: ${tx_ref}`);
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-bolt"></i> Pay with Chapa';
+                    }
+                } catch (pollErr) {
+                    log('err', `Poll error: ${pollErr.message}`);
+                }
+            }, 3000);
+        }
+
+        async function checkBalance() {
+            const userId = document.getElementById('payUserId').value.trim();
+            if (!userId) { log('err', 'User ID is required'); return; }
+            log('req', `GET /user/${userId}/balance`);
+            try {
+                const res = await fetch(`${API_URL}/user/${userId}/balance`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                const bal = data.credit_balance ?? '--';
+                document.getElementById('balanceDisplay').innerText = bal + ' Credits';
+                log('res', `Current Balance: ${bal} Credits`);
+            } catch (err) {
+                log('err', `Balance check failed: ${err.message}`);
+                document.getElementById('balanceDisplay').innerText = 'Error';
+            }
+        }
+
+        async function fetchModels() {
+            log("req", "GET /models/gated");
+            try {
+                const res = await fetch(`${API_URL}/models/gated?active_only=true`);
+                const data = await res.json();
+                const list = document.getElementById('modelList');
+                list.innerHTML = '';
+
+                const models = data.models || [];
+
+                if (Array.isArray(models)) {
+                    models.forEach(m => {
+                        list.innerHTML += `<div style="margin-bottom:5px; border-bottom:1px solid #eee;">
+                            <strong>${m.model_id}</strong><br>
+                            <span style="color:#666">${m.provider} | Base: ${m.base_price_tokens}</span>
+                        </div>`;
+                    });
+                    log("res", `Loaded ${models.length} models`);
+                } else {
+                    log("err", "Invalid model data format");
+                }
+            } catch (e) {
+                log("err", "Failed to fetch models");
+            }
+        }
+
+        async function loadModelsDropdown() {
+            const modelSelect = document.getElementById('genModel');
+
+            try {
+                log("sys", "Loading models from API...");
+                const res = await fetch(`${API_URL}/models/gated`);
+                const data = await res.json();
+
+                const models = data.models || [];
+
+                if (Array.isArray(models)) {
+                    models.forEach(m => {
+                        const option = document.createElement('option');
+                        option.value = m.model_id;
+                        option.setAttribute('data-price', m.base_price_tokens || 10);
+                        option.textContent = m.display_name || m.model_id;
+                        modelSelect.appendChild(option);
+                    });
+                    log("res", `Loaded ${models.length} models into dropdown`);
+                }
+            } catch (e) {
+                log("err", `Failed to load models: ${e.message}`);
+                const fallbackModels = [
+                    { model_id: 'flux.2-pro', name: 'Flux 2 Pro', price: 40 },
+                    { model_id: 'gemini-2', name: 'Gemini 2.0', price: 8 }
+                ];
+                fallbackModels.forEach(m => {
+                    const option = document.createElement('option');
+                    option.value = m.model_id;
+                    option.setAttribute('data-price', m.price);
+                    option.textContent = m.name;
+                    modelSelect.appendChild(option);
+                });
+            }
+
+            updateGenPrice();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadModelsDropdown();
+            fetchTemplates();
+            loadSavedSupabaseConfig();
+        });
+
+    </script>
+</body>
+
+</html>

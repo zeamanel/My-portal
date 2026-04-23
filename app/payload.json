@@ -1,0 +1,8 @@
+{
+    "user_id": "fc6f2b43-739c-4e8e-9e67-bd2389288922",
+    "prompt": "test",
+    "model_id": "black-forest-labs/flux.2-pro",
+    "quality": "2K",
+    "aspect_ratio": "16:9",
+    "is_public": true
+}

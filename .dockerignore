@@ -1,0 +1,13 @@
+node_modules/
+tests/
+.env
+__pycache__/
+*.pyc
+.git
+.github
+README.md
+fal_client-*.whl
+*.log
+*.mp4
+*.jpg
+*.png

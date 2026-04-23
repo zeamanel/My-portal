@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Odaflux – Template Factory</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #334155;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 2em;
+            background: linear-gradient(45deg, #38bdf8, #10b981);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            background: #e2e8f0;
+            padding: 6px;
+            border-radius: 12px;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: transparent;
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        .tab.active {
+            background: white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            color: #0ea5e9;
+        }
+
+        .tab:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.6);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+            border: 1px solid #f1f5f9;
+        }
+
+        .config-bar {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            background: #1e293b;
+            color: white;
+            padding: 14px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            align-items: flex-end;
+        }
+
+        .config-bar>div {
+            min-width: 170px;
+        }
+
+        .config-bar label {
+            font-size: 10px;
+            display: block;
+            margin-bottom: 4px;
+            color: #94a3b8;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        input[type="date"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 13px;
+            background: white;
+            color: #1e293b;
+            transition: border 0.2s;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #38bdf8;
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+        }
+
+        .config-bar input,
+        .config-bar select {
+            background: #334155;
+            color: white;
+            border-color: #475569;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: #38bdf8;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #0ea5e9;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #059669;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #dc2626;
+        }
+
+        .btn-purple {
+            background: #8b5cf6;
+            color: white;
+        }
+
+        .btn-purple:hover:not(:disabled) {
+            background: #7c3aed;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid #64748b;
+            color: #64748b;
+        }
+
+        .btn-outline:hover:not(:disabled) {
+            background: #334155;
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 5px 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .stage-badge {
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 0.8em;
+            font-weight: 700;
+        }
+
+        .raw {
+            background: #fed7aa;
+            color: #c2410f;
+        }
+
+        .refined {
+            background: #a5f3fc;
+            color: #0e7490;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 13px;
+        }
+
+        th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #64748b;
+        }
+
+        tr:hover td {
+            background: #f8fafc;
+        }
+
+        .log-container {
+            background: #1e293b;
+            color: #67e8f9;
+            font-family: 'Courier New', monospace;
+            padding: 15px;
+            border-radius: 12px;
+            height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .status-badge {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+
+        .status-connected {
+            background: #10b981;
+            box-shadow: 0 0 6px #10b981;
+            animation: pulse 2s infinite;
+        }
+
+        .status-disconnected {
+            background: #ef4444;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 4px #10b981;
+            }
+
+            50% {
+                box-shadow: 0 0 10px #10b981;
+            }
+        }
+
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 16px;
+        }
+
+        .image-card {
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #f8fafc;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .image-card:hover {
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .image-card.selected {
+            border-color: #38bdf8;
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.3);
+        }
+
+        .image-preview {
+            height: 180px;
+            background-size: cover;
+            background-position: center;
+            background-color: #e2e8f0;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .image-select-overlay {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #cbd5e1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s;
+            z-index: 2;
+        }
+
+        .image-select-overlay.checked {
+            background: #38bdf8;
+            border-color: #38bdf8;
+        }
+
+        .image-select-overlay.checked::after {
+            content: '✓';
+            color: white;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .image-info {
+            padding: 10px 12px;
+        }
+
+        .upload-zone {
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 32px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #f8fafc;
+        }
+
+        .upload-zone:hover,
+        .upload-zone.dragover {
+            border-color: #38bdf8;
+            background: rgba(56, 189, 248, 0.05);
+        }
+
+        .upload-zone i {
+            font-size: 2.5em;
+            color: #94a3b8;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .bulk-panel {
+            background: linear-gradient(135deg, #0f172a, #1e3a5f);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            color: white;
+            display: none;
+        }
+
+        .bulk-panel.visible {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .bulk-panel h3 {
+            margin: 0 0 14px;
+            color: #38bdf8;
+            font-size: 1em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .bulk-controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        .bulk-controls>div {
+            flex: 1;
+            min-width: 180px;
+        }
+
+        .bulk-controls label {
+            font-size: 11px;
+            color: #94a3b8;
+            display: block;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .bulk-controls select,
+        .bulk-controls textarea {
+            background: #1e3a5f;
+            color: white;
+            border-color: #334155;
+        }
+
+        .bulk-controls textarea {
+            resize: vertical;
+            min-height: 70px;
+        }
+
+        .result-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 14px;
+            margin-top: 10px;
+        }
+
+        .result-card .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .result-card pre {
+            background: #f1f5f9;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+            margin: 0;
+        }
+
+        .progress-bar-wrap {
+            background: #e2e8f0;
+            border-radius: 999px;
+            overflow: hidden;
+            height: 8px;
+        }
+
+        .progress-bar-fill {
+            background: linear-gradient(90deg, #38bdf8, #10b981);
+            height: 100%;
+            transition: width 0.3s;
+            border-radius: 999px;
+        }
+
+        .gemini-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: linear-gradient(90deg, #4285f4, #34a853, #fbbc04, #ea4335);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
+            font-size: 12px;
+        }
+
+        .tab-section-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #94a3b8;
+            font-weight: 700;
+            padding: 0 4px 2px;
+        }
+
+        .model-group-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: #94a3b8;
+        }
+
+        select optgroup {
+            font-weight: 700;
+        }
+
+        .info-box {
+            background: #fef9c3;
+            border-left: 4px solid #f59e0b;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #78350f;
+        }
+
+        .setup-box {
+            background: #f1f5f9;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #475569;
+            margin-top: 16px;
+        }
+
+        .setup-box code {
+            background: #e2e8f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+
+        .count-chip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #38bdf8;
+            color: white;
+            font-size: 11px;
+            font-weight: 800;
+            border-radius: 999px;
+            min-width: 22px;
+            height: 22px;
+            padding: 0 6px;
+        }
+
+        .ocr-toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            background: #f8fafc;
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+        }
+
+        .divider {
+            width: 1px;
+            background: #e2e8f0;
+            align-self: stretch;
+            margin: 0 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1><i class="fas fa-layer-group"></i> Odaflux Template Factory</h1>
+                <small style="color:#64748b;">Two-Stage AI Pipeline + Vision Analysis → context_images</small>
+            </div>
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab(0)"><i class="fas fa-tachometer-alt"></i>
+                    Dashboard</button>
+                <button class="tab" onclick="switchTab(1)"><i class="fas fa-brain"></i> Ideas Pipeline</button>
+                <button class="tab" onclick="switchTab(2)"><i class="fas fa-history"></i> History</button>
+                <button class="tab" onclick="switchTab(3)">📋 Raw Ideas</button>
+                <button class="tab" onclick="switchTab(4)"><i class="fas fa-images"></i> Prompt Images</button>
+                <button class="tab" onclick="switchTab(5)"><i class="fas fa-robot"></i> OCR Prompts</button>
+            </div>
+        </header>
+        <div class="config-bar">
+            <div><label>Supabase URL</label><input type="text" id="supabaseUrl" placeholder="https://xyz.supabase.co"
+                    style="width:210px;"></div>
+            <div><label>Supabase Anon Key</label><input type="password" id="supabaseKey" placeholder="eyJ..."
+                    style="width:230px;"></div>
+            <div><label>Service Role Key <span style="color:#fbbf24;font-size:9px;">(bypasses RLS)</span></label><input
+                    type="password" id="supabaseServiceKey" placeholder="eyJ... (service_role)" style="width:230px;">
+            </div>
+            <div><label>Gemini API Key</label><input type="password" id="geminiKey" placeholder="AIza..."
+                    style="width:170px;"></div>
+            <div><label>OpenRouter Key</label><input type="password" id="openrouterKey" placeholder="sk-or-..."
+                    style="width:160px;"></div>
+            <div><label>LLM Model</label><select id="llmSelector"
+                    style="background:#334155;color:white;border:none;padding:8px;border-radius:6px;width:220px;"></select>
+            </div>
+            <button onclick="saveConfig()" class="btn btn-primary" style="margin-bottom:0; white-space:nowrap;"><i
+                    class="fas fa-save"></i> Save & Connect</button>
+            <div style="display:flex;align-items:center;gap:6px;margin-left:auto;"><span
+                    class="status-badge status-disconnected" id="statusLed"></span><span id="statusText"
+                    style="font-size:12px;white-space:nowrap;">Not connected</span></div>
+        </div>
+        <div id="tab0" class="tab-content active">
+            <div class="card">
+                <h2><i class="fas fa-table"></i> Existing Templates</h2>
+                <div style="margin-bottom:16px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;"><select
+                        id="mediaFilter" onchange="loadDashboard()">
+                        <option value="">All Media</option>
+                        <option value="Image">Image</option>
+                        <option value="Video">Video</option>
+                        <option value="Audio">Audio</option>
+                    </select><label style="display:flex;align-items:center;gap:6px;"><input type="checkbox"
+                            id="publishedOnly" checked onchange="loadDashboard()"> Published only</label><button
+                        onclick="loadDashboard()" class="btn btn-primary"><i class="fas fa-sync"></i> Refresh</button>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table id="templateTable">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Description</th>
+                                <th>Media</th>
+                                <th>Price</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="6">Not connected</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div id="tab1" class="tab-content">
+            <div class="card">
+                <h2><i class="fas fa-brain"></i> Two-Stage Template Idea Pipeline</h2>
+                <p style="color:#64748b;margin-bottom:20px;">Stage 1: AI generates raw ideas · Stage 2: Selected ideas
+                    are converted into templates.</p>
+                <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;"><button onclick="runStage1()"
+                        id="stage1Btn" class="btn btn-primary"><i class="fas fa-sparkles"></i> Stage 1: Generate Raw
+                        Ideas</button><button onclick="runStage2()" id="stage2Btn" class="btn btn-success" disabled><i
+                            class="fas fa-wand-magic-sparkles"></i> Stage 2: Generate Template</button><button
+                        onclick="loadIdeas()" class="btn btn-outline"><i class="fas fa-sync"></i> Refresh</button></div>
+                <div style="overflow-x:auto;">
+                    <table id="ideasTable">
+                        <thead>
+                            <tr>
+                                <th style="width:40px;"><input type="checkbox" id="selectAllIdeas"
+                                        onchange="toggleAllIdeas()"></th>
+                                <th>Source</th>
+                                <th>Stage</th>
+                                <th>Title</th>
+                                <th>Media</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="6">Not connected</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div id="tab2" class="tab-content">
+            <div class="card">
+                <h2><i class="fas fa-history"></i> Request History</h2>
+                <div style="margin-bottom:16px;display:flex;gap:12px;flex-wrap:wrap;"><input type="date" id="dateFrom"
+                        onchange="loadHistory()"><input type="date" id="dateTo" onchange="loadHistory()"><button
+                        onclick="loadHistory()" class="btn btn-primary"><i class="fas fa-filter"></i>
+                        Filter</button><button onclick="exportHistoryCSV()" class="btn btn-outline"><i
+                            class="fas fa-download"></i> Export CSV</button></div>
+                <div style="max-height:500px;overflow:auto;">
+                    <table id="historyTable">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>User</th>
+                                <th>Prompt</th>
+                                <th>Model</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="4">Not connected</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div id="tab3" class="tab-content">
+            <div class="card">
+                <h2>📋 Saved Raw Ideas</h2>
+                <div style="margin-bottom:16px;"><button onclick="loadSavedRawIdeas()" class="btn btn-primary"><i
+                            class="fas fa-sync"></i> Refresh</button></div>
+                <div style="overflow-x:auto;">
+                    <table id="savedRawIdeasTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Title</th>
+                                <th>Description</th>
+                                <th>Media</th>
+                                <th>Demand</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="7">Not connected</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div id="tab4" class="tab-content">
+            <div class="card">
+                <h2><i class="fas fa-images"></i> Prompt Images</h2>
+                <div style="margin-bottom:16px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;"><button
+                        onclick="loadPromptImages()" class="btn btn-primary"><i class="fas fa-sync"></i>
+                        Refresh</button><button onclick="scanPromptImagesBucket()" class="btn btn-outline"><i
+                            class="fas fa-search"></i> Scan Bucket</button></div>
+                <div id="promptImagesGrid" class="image-grid">
+                    <div>Not connected</div>
+                </div>
+                <div class="setup-box" style="margin-top:20px;"><strong>SQL
+                        Setup:</strong><br><code>ALTER TABLE template_idea ADD COLUMN IF NOT EXISTS reference_image_url TEXT;</code><br><code>CREATE TABLE IF NOT EXISTS prompt_images (id UUID DEFAULT gen_random_uuid() PRIMARY KEY, image_url TEXT, prompt_text TEXT, processed BOOLEAN DEFAULT FALSE, template_id UUID, created_at TIMESTAMP DEFAULT NOW());</code>
+                </div>
+            </div>
+        </div>
+        <div id="tab5" class="tab-content">
+            <div class="card">
+                <h2><i class="fas fa-robot"></i> Context Images Builder</h2>
+                <p style="color:#64748b;margin:0 0 16px;">Scan <code>oda-brain</code> bucket (folders: EG, ET, KE, NG,
+                    VN → each may contain category subfolders like architecture, street-scenes, etc.) and populate
+                    <strong>context_images</strong> table with AI-generated descriptions.
+                </p>
+                <div class="ocr-toolbar">
+                    <button onclick="scanOcrImages()" class="btn btn-primary btn-sm"><i class="fas fa-search"></i> Scan
+                        Bucket</button>
+                    <button onclick="ensureContextImagesTable()" class="btn btn-outline btn-sm"
+                        title="Create context_images table if missing"><i class="fas fa-database"></i> Setup
+                        Table</button>
+                    <button onclick="testContextSave()" class="btn btn-outline btn-sm" title="Insert a test row"><i
+                            class="fas fa-vial"></i> Test Save</button>
+                    <div class="divider"></div>
+                    <button onclick="document.getElementById('localImageUpload').click()"
+                        class="btn btn-purple btn-sm"><i class="fas fa-upload"></i> Upload Local Images</button>
+                    <input type="file" id="localImageUpload" accept="image/*" multiple style="display:none;"
+                        onchange="handleLocalImageUpload(event)">
+                    <div class="divider"></div>
+                    <button onclick="selectAllImages()" class="btn btn-outline btn-sm"><i
+                            class="fas fa-check-square"></i> Select All</button>
+                    <button onclick="deselectAllImages()" class="btn btn-outline btn-sm"><i class="fas fa-square"></i>
+                        Deselect All</button>
+                    <span id="selectionCounter" style="color:#64748b;font-size:13px;font-weight:600;margin-left:4px;">0
+                        selected</span>
+                    <div class="divider"></div>
+                    <label style="font-size:12px;color:#475569;font-weight:600;">Vision Model:</label>
+                    <select id="ocrVisionModel"
+                        style="background:#f1f5f9;padding:7px;border-radius:6px;font-size:13px;min-width:220px;">
+                        <optgroup label="── Gemini Direct ──">
+                            <option value="gemini-2.0-flash" selected>Gemini 2.0 Flash</option>
+                            <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro</option>
+                        </optgroup>
+                    </select>
+                    <button onclick="sendSelectedToGemini()" class="btn btn-success btn-sm" id="sendBulkBtn" disabled><i
+                            class="fas fa-paper-plane"></i> Analyze & Store</button>
+                </div>
+                <div class="bulk-panel" id="bulkPanel">
+                    <h3><i class="fas fa-layer-group"></i> Bulk Analysis Settings &nbsp;<span id="bulkCountBadge"
+                            class="count-chip">0</span></h3>
+                    <div class="bulk-controls">
+                        <div style="flex:2; min-width:260px;"><label>Analysis Prompt</label>
+                            <textarea
+                                id="bulkPrompt">Describe this image in detail for a context image database. Focus on architecture, street scenes, landscapes, lifestyle, or fashion. Return a concise, informative paragraph (2-3 sentences).</textarea>
+                        </div>
+                        <div><label>Save mode</label>
+                            <select id="bulkSaveMode">
+                                <option value="context_images" selected>✅ context_images (recommended)</option>
+                                <option value="none">No – show only</option>
+                            </select>
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:8px;justify-content:flex-end;">
+                            <button onclick="sendSelectedToGemini()" class="btn btn-success" id="sendBulkBtn2"><i
+                                    class="fas fa-paper-plane"></i> Analyze & Store</button>
+                            <button onclick="clearResults()" class="btn btn-outline"
+                                style="border-color:#475569;color:#e2e8f0;"><i class="fas fa-trash"></i> Clear
+                                Results</button>
+                        </div>
+                    </div>
+                    <div id="bulkProgress" style="margin-top:14px;display:none;">
+                        <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span
+                                style="font-size:12px;color:#94a3b8;" id="progressLabel">Processing 0 / 0</span><span
+                                style="font-size:12px;color:#38bdf8;" id="progressPct">0%</span></div>
+                        <div class="progress-bar-wrap">
+                            <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="bulkResults" style="max-height:500px;overflow-y:auto;margin-bottom:20px;display:none;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                        <h3 style="margin:0;font-size:1em;color:#0ea5e9;"><i class="fas fa-list-check"></i> Generated
+                            Descriptions</h3>
+                        <button onclick="exportResultsJSON()" class="btn btn-outline btn-sm"><i
+                                class="fas fa-download"></i> Export JSON</button>
+                    </div>
+                    <div id="resultsContainer"></div>
+                </div>
+                <div id="ocrImagesGrid" class="image-grid">
+                    <div style="grid-column:1/-1;text-align:center;color:#94a3b8;padding:40px;"><i class="fas fa-images"
+                            style="font-size:2em;margin-bottom:10px;display:block;"></i> Click <strong>Scan
+                            Bucket</strong> to load from oda-brain, or upload local images.</div>
+                </div>
+                <div class="setup-box"><strong>SQL for context_images table:</strong><br>
+                    <code>CREATE TABLE IF NOT EXISTS context_images ( id UUID DEFAULT gen_random_uuid() PRIMARY KEY, country_code TEXT, folder TEXT, image_url TEXT UNIQUE, description TEXT, embedding vector(1536) NULL, created_at TIMESTAMPTZ DEFAULT NOW() );</code><br>
+                    <code>CREATE INDEX IF NOT EXISTS idx_context_images_country ON context_images(country_code);</code><br>
+                    <code>CREATE INDEX IF NOT EXISTS idx_context_images_folder ON context_images(folder);</code>
+                </div>
+            </div>
+        </div>
+        <div class="card" style="margin-top:24px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <h2 style="margin:0;"><i class="fas fa-terminal"></i> Live Logs</h2><button onclick="clearLogs()"
+                    class="btn btn-outline btn-sm"><i class="fas fa-trash"></i> Clear</button>
+            </div>
+            <div id="logs" class="log-container"></div>
+        </div>
+    </div>
+    <script>
+        let supabaseClient = null;
+        let supabaseAdminClient = null;
+        let currentTemplates = [];
+        let currentIdeas = [];
+        let selectedIdeaIds = new Set();
+        let ocrImagesList = [];
+        let selectedImageUrls = new Set();
+        let analysisResults = [];
+        const DEFAULT_CREATOR_ID = "cf47617f-a205-46ab-9268-d8b816a54758";
+        const OCR_BUCKET = "oda-brain";
+        const COUNTRY_FOLDERS = ["EG", "ET", "KE", "NG", "VN"];
+
+        function adminClient() { return supabaseAdminClient || supabaseClient; }
+        function log(type, msg) { const container = document.getElementById('logs'); if (!container) return; const div = document.createElement('div'); const time = new Date().toLocaleTimeString('en-US', { hour12: false }); let color = '#67e8f9'; if (type === 'err') color = '#f87171'; if (type === 'success') color = '#4ade80'; if (type === 'sys') color = '#c084fc'; if (type === 'warn') color = '#fbbf24'; div.innerHTML = `<span style="color:#94a3b8">[${time}]</span> <span style="color:${color}">[${type.toUpperCase()}]</span> ${msg}`; container.appendChild(div); container.scrollTop = container.scrollHeight; }
+        function clearLogs() { document.getElementById('logs').innerHTML = ''; log('sys', 'Logs cleared'); }
+        function updateConnectionStatus(connected, message) { const led = document.getElementById('statusLed'); const span = document.getElementById('statusText'); led.className = 'status-badge ' + (connected ? 'status-connected' : 'status-disconnected'); span.innerText = message || (connected ? 'Connected' : 'Disconnected'); }
+        function isSupabaseLoaded() { return typeof window.supabase !== 'undefined' && typeof window.supabase.createClient === 'function'; }
+        async function testSupabaseConnection(client) { try { const { error } = await client.from('ai_models').select('id').limit(1); if (error) throw error; return true; } catch (e) { log('err', `Connection test failed: ${e.message}`); return false; } }
+        async function initSupabase() { const url = document.getElementById('supabaseUrl').value.trim(); const anonKey = document.getElementById('supabaseKey').value.trim(); const serviceKey = document.getElementById('supabaseServiceKey').value.trim(); if (!url || !anonKey) { log('err', 'Supabase URL and Anon Key are required'); updateConnectionStatus(false, 'Missing credentials'); return false; } if (!isSupabaseLoaded()) { log('err', 'Supabase JS not loaded'); return false; } try { supabaseClient = window.supabase.createClient(url, anonKey); supabaseAdminClient = serviceKey ? window.supabase.createClient(url, serviceKey) : null; const ok = await testSupabaseConnection(adminClient()); if (ok) { updateConnectionStatus(true, 'Connected'); log('success', 'Supabase connected'); loadDashboard(); loadIdeas(); loadHistory(); loadSavedRawIdeas(); return true; } else { updateConnectionStatus(false, 'Connection failed'); return false; } } catch (err) { log('err', `Supabase init error: ${err.message}`); updateConnectionStatus(false, 'Error'); return false; } }
+        function saveConfig() { const url = document.getElementById('supabaseUrl').value.trim(); const anonKey = document.getElementById('supabaseKey').value.trim(); const serviceKey = document.getElementById('supabaseServiceKey').value.trim(); const geminiKey = document.getElementById('geminiKey').value.trim(); const orKey = document.getElementById('openrouterKey').value.trim(); if (!url || !anonKey) { log('err', 'Supabase URL and Anon Key required'); return; } localStorage.setItem('supabase_url', url); localStorage.setItem('supabase_anon_key', anonKey); serviceKey ? localStorage.setItem('supabase_service_key', serviceKey) : localStorage.removeItem('supabase_service_key'); geminiKey ? localStorage.setItem('gemini_key', geminiKey) : localStorage.removeItem('gemini_key'); orKey ? localStorage.setItem('openrouter_key', orKey) : localStorage.removeItem('openrouter_key'); initSupabase(); }
+        function loadSavedConfigIntoInputs() { const fields = { supabaseUrl: 'supabase_url', supabaseKey: 'supabase_anon_key', supabaseServiceKey: 'supabase_service_key', geminiKey: 'gemini_key', openrouterKey: 'openrouter_key' }; for (const [id, key] of Object.entries(fields)) { const v = localStorage.getItem(key); if (v) document.getElementById(id).value = v; } }
+        function populateLLMSelector() { const select = document.getElementById('llmSelector'); select.innerHTML = ''; const groups = [{ label: '── Gemini Direct ──', models: [{ value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' }, { value: 'gemini-1.5-pro-latest', label: 'Gemini 1.5 Pro' }] }, { label: '── Via OpenRouter ──', models: [{ value: 'openai/gpt-4o', label: 'GPT-4o' }] }]; for (const group of groups) { const og = document.createElement('optgroup'); og.label = group.label; for (const m of group.models) { const opt = document.createElement('option'); opt.value = m.value; opt.textContent = m.label; og.appendChild(opt); } select.appendChild(og); } }
+        function switchTab(n) { document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.querySelectorAll('.tab').forEach(el => el.classList.remove('active')); document.getElementById('tab' + n).classList.add('active'); document.querySelectorAll('.tab')[n].classList.add('active'); if (n === 5 && adminClient()) loadOcrImages(); }
+        function getGeminiKey() { return localStorage.getItem('gemini_key') || document.getElementById('geminiKey').value.trim(); }
+        function getOpenrouterKey() { return localStorage.getItem('openrouter_key') || document.getElementById('openrouterKey').value.trim(); }
+        function isGeminiDirect(model) { return model.startsWith('gemini-'); }
+        async function callVisionAI(model, imageUrlOrBase64, promptText, isBase64 = false) { const geminiKey = getGeminiKey(); if (!geminiKey) throw new Error('Gemini API key missing'); let base64, mimeType = 'image/jpeg'; if (isBase64) { const parts = imageUrlOrBase64.split(','); base64 = parts[1]; mimeType = parts[0].match(/:(.*?);/)?.[1] || 'image/jpeg'; } else { const imgResp = await fetch(imageUrlOrBase64); const blob = await imgResp.blob(); mimeType = blob.type || 'image/jpeg'; base64 = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result.split(',')[1]); reader.onerror = reject; reader.readAsDataURL(blob); }); } const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`; const body = { contents: [{ parts: [{ text: promptText }, { inline_data: { mime_type: mimeType, data: base64 } }] }], generationConfig: { temperature: 0.4, maxOutputTokens: 1024 } }; const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); if (!res.ok) { const e = await res.json(); throw new Error(`Gemini vision ${res.status}: ${e.error?.message || res.statusText}`); } const json = await res.json(); return json.candidates[0].content.parts[0].text; }
+        async function loadDashboard() { if (!adminClient()) return; const media = document.getElementById('mediaFilter').value; const publishedOnly = document.getElementById('publishedOnly').checked; let query = adminClient().from('creator_templates').select('*'); if (media) query = query.eq('media_type', media); if (publishedOnly) query = query.eq('is_published', true); const { data, error } = await query.order('created_at', { ascending: false }); if (error) { log('err', `Load templates error: ${error.message}`); return; } currentTemplates = data; const tbody = document.querySelector('#templateTable tbody'); tbody.innerHTML = ''; if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="6">No templates found</td></tr>'; return; } data.forEach(t => { const row = tbody.insertRow(); row.insertCell(0).innerText = t.title || 'Untitled'; row.insertCell(1).innerText = (t.description || '').slice(0, 80); row.insertCell(2).innerText = t.media_type || 'Image'; row.insertCell(3).innerText = t.price_tokens || t.base_price_tokens || 0; row.insertCell(4).innerHTML = t.is_published ? '<span style="color:#10b981;">Published</span>' : '<span style="color:#f97316;">Draft</span>'; row.insertCell(5).innerHTML = `<button class="btn btn-outline btn-sm" onclick="alert('Edit not implemented yet')">Edit</button>`; }); log('success', `Loaded ${data.length} templates`); }
+        function toggleAllIdeas() { const checked = document.getElementById('selectAllIdeas').checked; if (checked) { currentIdeas.forEach(i => selectedIdeaIds.add(i.id)); } else { selectedIdeaIds.clear(); } renderIdeasTable(); }
+        function toggleIdeaSelection(ideaId) { if (selectedIdeaIds.has(ideaId)) selectedIdeaIds.delete(ideaId); else selectedIdeaIds.add(ideaId); renderIdeasTable(); }
+        function renderIdeasTable() { const tbody = document.querySelector('#ideasTable tbody'); tbody.innerHTML = ''; if (currentIdeas.length === 0) { tbody.innerHTML = '<tr><td colspan="6">No ideas found</td></tr>'; document.getElementById('stage2Btn').disabled = true; return; } currentIdeas.forEach(idea => { const row = tbody.insertRow(); const isSelected = selectedIdeaIds.has(idea.id); row.insertCell(0).innerHTML = `<input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleIdeaSelection('${idea.id}')">`; row.insertCell(1).innerHTML = idea._source === 'prom_ocr' ? '<span style="background:#7c3aed;color:white;padding:3px 10px;border-radius:9999px;">OCR</span>' : '<span style="background:#0ea5e9;color:white;padding:3px 10px;border-radius:9999px;">Idea</span>'; row.insertCell(2).innerHTML = idea.stage === 'raw' ? '<span class="stage-badge raw">Raw</span>' : '<span class="stage-badge refined">Processed</span>'; row.insertCell(3).innerText = idea.title || ''; row.insertCell(4).innerText = idea.media_type || 'Image'; row.insertCell(5).innerHTML = `<button class="btn btn-primary btn-sm" onclick="generateTemplateFromIdea('${idea.id}')">Generate</button>`; if (isSelected) row.style.background = '#f0f9ff'; }); document.getElementById('stage2Btn').disabled = selectedIdeaIds.size === 0; if (selectedIdeaIds.size > 0) document.getElementById('stage2Btn').innerHTML = `<i class="fas fa-wand-magic-sparkles"></i> Stage 2: Generate Template (${selectedIdeaIds.size})`; else document.getElementById('stage2Btn').innerHTML = `<i class="fas fa-wand-magic-sparkles"></i> Stage 2: Generate Template`; document.getElementById('selectAllIdeas').checked = currentIdeas.length > 0 && selectedIdeaIds.size === currentIdeas.length; }
+        async function loadIdeas() { if (!adminClient()) return; const { data: ideaData, error: ideaErr } = await adminClient().from('template_idea').select('*').eq('stage', 'raw').order('created_at', { ascending: false }); if (ideaErr) log('err', `Load ideas error: ${ideaErr.message}`); const { data: ocrData, error: ocrErr } = await adminClient().from('prom_ocr_table').select('*').is('template_idea_id', null).is('processed', false); if (ocrErr) log('warn', `Load prom_ocr_table error: ${ocrErr.message}`); const templateIdeas = (ideaData || []).map(r => ({ ...r, _source: 'template_idea' })); const ocrIdeas = (ocrData || []).map(r => ({ id: r.id, _source: 'prom_ocr', stage: 'raw', title: (r.analaysis_text || r.extracted_text || '').substring(0, 60), description: r.analaysis_text || r.extracted_text || '', prompt_template: r.analaysis_text || r.extracted_text || '', media_type: 'Image', created_at: r.created_at, image_url: r.image_url })); currentIdeas = [...templateIdeas, ...ocrIdeas]; const validIds = new Set(currentIdeas.map(i => i.id)); for (const id of selectedIdeaIds) if (!validIds.has(id)) selectedIdeaIds.delete(id); renderIdeasTable(); log('success', `Loaded ${currentIdeas.length} raw ideas`); }
+        async function runStage1() { log('sys', 'Stage 1: Generating raw ideas…'); const system = "You are an expert product manager. Generate 5 fresh template ideas. Return ONLY a valid JSON array with fields: title, description, media_type (Image/Video/Audio)."; const user = "Generate creative template ideas for the Ethiopian market."; let aiText; try { aiText = await callAI(system, user); } catch (e) { log('err', `Stage 1 AI call failed: ${e.message}`); return; } let ideas; try { let cleanJson = aiText.replace(/```json/gi, '').replace(/```/g, '').trim(); ideas = JSON.parse(cleanJson); } catch (err) { log('err', `Stage 1 parse error: ${err.message}`); return; } if (!Array.isArray(ideas)) { log('err', 'AI did not return an array'); return; } try { for (const idea of ideas) { await adminClient().from('template_idea').insert({ stage: 'raw', title: idea.title, description: idea.description, prompt_template: idea.description, media_type: idea.media_type || 'Image', raw_input_analysis: JSON.stringify({ source: 'ai_generation' }) }); } log('success', `Generated ${ideas.length} raw ideas`); loadIdeas(); } catch (err) { log('err', `Stage 1 DB insert failed: ${err.message}`); } }
+        const INDUSTRY_ROTATION = [{ industry: 'Luxury E-Commerce', buyers: 'online store owners', demand: 'high' }]; let _industryIndex = 0; function nextIndustry() { return INDUSTRY_ROTATION[_industryIndex++ % INDUSTRY_ROTATION.length]; }
+        async function aiPass1_CreativeBrief(idea, industryCtx) { const sys = "You are a senior creative director. Write a tight creative brief."; const usr = `Idea: ${idea.title}\n${idea.description}\nMedia: ${idea.media_type}\nIndustry: ${industryCtx.industry}`; return await callAI(sys, usr); }
+        async function aiPass2_TemplateJSON(brief, idea, industryCtx) { const sys = "You are an AI prompt engineer. Return a JSON object with title, description, prompt_template (using {{placeholders}}), and fields array."; const usr = `Brief: ${brief}\nMedia: ${idea.media_type}`; const rawText = await callAI(sys, usr); let clean = rawText.replace(/```json/gi, '').replace(/```/g, '').trim(); const jsonMatch = clean.match(/\{[\s\S]*\}/); if (!jsonMatch) throw new Error('No JSON'); return JSON.parse(jsonMatch[0]); }
+        async function aiEnrichTemplate(idea, industryCtx) { const brief = await aiPass1_CreativeBrief(idea, industryCtx); return await aiPass2_TemplateJSON(brief, idea, industryCtx); }
+        function validateEnriched(enriched, idea) { if (!enriched || typeof enriched !== 'object') throw new Error('Invalid enriched object'); enriched.title = enriched.title || idea.title || 'Untitled'; enriched.description = enriched.description || idea.description || ''; enriched.prompt_template = enriched.prompt_template || idea.prompt_template || ''; if (!Array.isArray(enriched.fields)) enriched.fields = []; return enriched; }
+        async function generateTemplateFromIdea(ideaId, industryCtx) { if (!industryCtx) industryCtx = nextIndustry(); const idea = currentIdeas.find(i => i.id === ideaId); if (!idea) { log('err', 'Idea not found'); return; } try { let enriched; try { enriched = await aiEnrichTemplate(idea, industryCtx); enriched = validateEnriched(enriched, idea); } catch (aiErr) { log('warn', `AI enrichment failed, using fallback`); enriched = validateEnriched({ title: idea.title, description: idea.description, prompt_template: idea.description, fields: [] }, idea); } const tplData = { title: enriched.title, description: enriched.description, prompt_template: enriched.prompt_template, media_type: idea.media_type || 'Image', is_published: false, creator_id: DEFAULT_CREATOR_ID, base_price_tokens: 10 }; const { data: newTpl, error: insertErr } = await adminClient().from('creator_templates').insert(tplData).select('id').single(); if (insertErr) throw new Error(insertErr.message); await createTemplateFields(newTpl.id, enriched.prompt_template, enriched.fields); if (idea._source === 'prom_ocr') await adminClient().from('prom_ocr_table').update({ processed: true, template_idea_id: newTpl.id }).eq('id', ideaId); else await adminClient().from('template_idea').update({ stage: 'processed' }).eq('id', ideaId); log('success', `Template "${enriched.title}" created`); selectedIdeaIds.delete(ideaId); loadIdeas(); } catch (err) { log('err', `generateTemplateFromIdea failed: ${err.message}`); } }
+        async function createTemplateFields(templateId, promptTemplate, aiFields) { const seen = new Set(); const orderedNames = []; const push = (name) => { const k = name.toLowerCase().replace(/[^a-z0-9_]/g, '_'); if (k && !seen.has(k)) { seen.add(k); orderedNames.push(k); } };[...(promptTemplate || '').matchAll(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g)].forEach(m => push(m[1])); aiFields.forEach(f => { if (f.field_name) push(f.field_name); }); if (orderedNames.length === 0) return; const fieldsToInsert = orderedNames.map((fn, idx) => ({ template_id: templateId, field_name: fn, field_label: fn, field_type: 'text', placeholder: `e.g. your ${fn}`, is_required: true, options: [], variable_values: {}, display_order: idx })); const { error } = await adminClient().from('template_fields').insert(fieldsToInsert); if (error) log('err', `template_fields insert error: ${error.message}`); else log('success', `Inserted ${fieldsToInsert.length} fields`); }
+        async function runStage2() { if (selectedIdeaIds.size === 0) { log('warn', 'No ideas selected'); return; } const ids = Array.from(selectedIdeaIds); log('sys', `Stage 2 START: ${ids.length} ideas`); for (let i = 0; i < ids.length; i++) { try { await generateTemplateFromIdea(ids[i], nextIndustry()); } catch (e) { log('err', `Failed on idea ${ids[i]}: ${e.message}`); } if (i < ids.length - 1) await new Promise(r => setTimeout(r, 1500)); } log('success', 'Stage 2 complete'); }
+        async function loadHistory() { if (!adminClient()) return; const { data, error } = await adminClient().from('generation_requests').select('*').order('created_at', { ascending: false }).limit(100); if (error) { log('err', `History error: ${error.message}`); return; } const tbody = document.querySelector('#historyTable tbody'); tbody.innerHTML = ''; if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="4">No history</td></tr>'; return; } data.forEach(r => { const row = tbody.insertRow(); row.insertCell(0).innerText = new Date(r.created_at).toLocaleString(); row.insertCell(1).innerText = r.user_id?.slice(0, 8) || 'unknown'; row.insertCell(2).innerText = (r.prompt || '').slice(0, 60); row.insertCell(3).innerText = r.model_id || ''; }); log('success', `Loaded ${data.length} history records`); }
+        function exportHistoryCSV() { alert('Not implemented'); }
+        async function loadSavedRawIdeas() { if (!adminClient()) return; const { data, error } = await adminClient().from('template_idea').select('*').eq('stage', 'raw').order('created_at', { ascending: false }); if (error) { log('err', `Load raw ideas error: ${error.message}`); return; } const tbody = document.querySelector('#savedRawIdeasTable tbody'); tbody.innerHTML = ''; if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="7">No raw ideas</td></tr>'; return; } data.forEach(idea => { const row = tbody.insertRow(); row.insertCell(0).innerText = idea.id.slice(0, 8); row.insertCell(1).innerText = idea.title || ''; row.insertCell(2).innerText = (idea.description || '').slice(0, 80); row.insertCell(3).innerText = idea.media_type || 'Image'; row.insertCell(4).innerHTML = idea.demand_score ? `⭐ ${idea.demand_score}` : '-'; row.insertCell(5).innerText = new Date(idea.created_at).toLocaleDateString(); row.insertCell(6).innerHTML = `<button class="btn btn-primary btn-sm" onclick="refineSingleIdea('${idea.id}')">Refine</button>`; }); log('success', `Loaded ${data.length} raw ideas`); }
+        async function refineSingleIdea(ideaId) { const idea = currentIdeas.find(i => i.id === ideaId); if (!idea) { const { data, error } = await adminClient().from('template_idea').select('*').eq('id', ideaId).single(); if (error || !data) { log('err', 'Could not load idea'); return; } await generateTemplateFromIdea(data.id, nextIndustry()); } else { await generateTemplateFromIdea(idea.id, nextIndustry()); } }
+        async function loadPromptImages() { if (!adminClient()) return; const { data, error } = await adminClient().from('prompt_images').select('*').order('created_at', { ascending: false }); if (error) { log('err', `Prompt images error: ${error.message}`); return; } const grid = document.getElementById('promptImagesGrid'); if (!data || data.length === 0) { grid.innerHTML = '<div>No prompt images found</div>'; return; } grid.innerHTML = ''; data.forEach(img => { const card = document.createElement('div'); card.className = 'image-card'; card.innerHTML = `<div class="image-preview" style="background-image:url('${img.image_url}')"></div><div class="image-info"><strong>${(img.prompt_text || '').slice(0, 50)}</strong><div>${img.processed ? '✅ Processed' : '⏳ Pending'}</div></div>`; grid.appendChild(card); }); log('success', `Loaded ${data.length} prompt images`); }
+        function scanPromptImagesBucket() { alert('Not implemented'); }
+        // ---- Core: load images from oda-brain with country + category ----
+        async function loadOcrImages() {
+            if (!adminClient()) return;
+            // Fetch already processed images (optional dedup)
+            const { data: processedRows, error: procErr } = await adminClient().from('context_images').select('image_url');
+            if (procErr) log('err', `context_images query error: ${procErr.message}`);
+            const processedUrls = new Set(processedRows?.map(r => r.image_url) || []);
+            const bucketImages = [];
+            for (const country of COUNTRY_FOLDERS) {
+                // List all objects under the country prefix (including subfolders)
+                const { data: files, error: listErr } = await adminClient().storage.from(OCR_BUCKET).list(country, { limit: 1000 });
+                if (listErr) {
+                    log('err', `List bucket ${OCR_BUCKET}/${country} error: ${listErr.message}`);
+                    continue;
+                }
+                if (!files || files.length === 0) continue;
+                for (const file of files) {
+                    if (file.name.startsWith('.') || !file.name.match(/\.(jpg|jpeg|png|webp)$/i)) continue;
+                    // Determine category: if file is inside a subfolder, e.g., "architecture/image.jpg"
+                    let category = "general";
+                    const pathParts = file.name.split('/');
+                    if (pathParts.length > 1) {
+                        category = pathParts[0]; // first subfolder name
+                    } else {
+                        // no subfolder – we can optionally assign based on heuristics or leave as "general"
+                        category = "general";
+                    }
+                    const fullPath = `${country}/${file.name}`;
+                    const { data: urlData } = adminClient().storage.from(OCR_BUCKET).getPublicUrl(fullPath);
+                    const canonicalUrl = urlData.publicUrl;
+                    const isProcessed = processedUrls.has(canonicalUrl);
+                    bucketImages.push({
+                        name: file.name,
+                        url: canonicalUrl,
+                        processed: isProcessed,
+                        source: 'bucket',
+                        country_code: country,
+                        folder: category,
+                        fullPath: fullPath
+                    });
+                }
+            }
+            const localImages = ocrImagesList.filter(i => i.source === 'local');
+            ocrImagesList = [...bucketImages, ...localImages];
+            renderOcrGrid();
+            log('success', `Loaded ${bucketImages.length} bucket images (countries: ${COUNTRY_FOLDERS.join(', ')}) + ${localImages.length} local images`);
+        }
+        function scanOcrImages() { loadOcrImages(); }
+        function handleLocalImageUpload(event) { const files = Array.from(event.target.files); if (!files.length) return; let loaded = 0; for (const file of files) { const reader = new FileReader(); reader.onload = (e) => { const dataUrl = e.target.result; const existing = ocrImagesList.find(i => i.name === file.name && i.source === 'local'); if (!existing) ocrImagesList.push({ name: file.name, url: dataUrl, processed: false, source: 'local', country_code: null, folder: null }); loaded++; if (loaded === files.length) { renderOcrGrid(); log('success', `Loaded ${files.length} local image(s)`); } }; reader.readAsDataURL(file); } event.target.value = ''; }
+        function renderOcrGrid() { const grid = document.getElementById('ocrImagesGrid'); if (!grid) return; if (ocrImagesList.length === 0) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#94a3b8;padding:40px;">No images. Scan bucket or upload local files.</div>'; return; } grid.innerHTML = ''; for (const img of ocrImagesList) { const isSelected = selectedImageUrls.has(img.url); const card = document.createElement('div'); card.className = 'image-card' + (isSelected ? ' selected' : ''); const processedBadge = img.processed ? '<span style="background:#10b981;color:white;padding:2px 8px;border-radius:20px;">✓ Processed</span>' : '<span style="background:#f97316;color:white;padding:2px 8px;border-radius:20px;">⏳ Pending</span>'; const sourceBadge = img.source === 'local' ? '<span style="background:#8b5cf6;color:white;padding:2px 6px;border-radius:10px;">Local</span>' : `<span style="background:#0ea5e9;color:white;padding:2px 6px;border-radius:10px;">${img.country_code || '?'}/${img.folder || '?'}</span>`; const checkClass = isSelected ? 'checked' : ''; card.innerHTML = `<div class="image-preview" style="background-image:url('${img.url}')" onclick="toggleImageSelection('${img.url}')"><div class="image-select-overlay ${checkClass}" onclick="toggleImageSelection('${img.url}');event.stopPropagation()"></div></div><div class="image-info"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><strong style="font-size:12px;">${escapeHtml(img.name)}</strong>${sourceBadge}</div><div style="display:flex;justify-content:space-between;">${processedBadge}${!img.processed ? `<button class="btn btn-primary btn-sm" onclick="processSingleImage('${img.url}')"><i class="fas fa-magic"></i> Process</button>` : ''}</div></div>`; grid.appendChild(card); } updateSelectionUI(); }
+        function toggleImageSelection(url) { if (selectedImageUrls.has(url)) selectedImageUrls.delete(url); else selectedImageUrls.add(url); renderOcrGrid(); }
+        function selectAllImages() { ocrImagesList.forEach(i => selectedImageUrls.add(i.url)); renderOcrGrid(); }
+        function deselectAllImages() { selectedImageUrls.clear(); renderOcrGrid(); }
+        function updateSelectionUI() { const count = selectedImageUrls.size; document.getElementById('selectionCounter').textContent = `${count} selected`; document.getElementById('sendBulkBtn').disabled = count === 0; document.getElementById('sendBulkBtn2').disabled = count === 0; document.getElementById('bulkCountLabel').textContent = count; document.getElementById('bulkCountBadge').textContent = count; const panel = document.getElementById('bulkPanel'); count > 0 ? panel.classList.add('visible') : panel.classList.remove('visible'); }
+        async function sendSelectedToGemini() {
+            if (selectedImageUrls.size === 0) { log('warn', 'No images selected'); return; }
+            const model = document.getElementById('ocrVisionModel').value;
+            const prompt = document.getElementById('bulkPrompt').value.trim() || "Describe this image in detail for a context image database. Focus on architecture, street scenes, landscapes, lifestyle, or fashion. Return a concise paragraph (2-3 sentences).";
+            const saveMode = document.getElementById('bulkSaveMode').value;
+            if (saveMode !== 'context_images' && saveMode !== 'none') { log('warn', 'Save mode not supported, using none'); }
+            const selectedList = ocrImagesList.filter(i => selectedImageUrls.has(i.url));
+            const total = selectedList.length;
+            const progressWrap = document.getElementById('bulkProgress');
+            const progressFill = document.getElementById('progressFill');
+            const progressLabel = document.getElementById('progressLabel');
+            const progressPct = document.getElementById('progressPct');
+            progressWrap.style.display = 'block';
+            const resultsDiv = document.getElementById('bulkResults');
+            const container = document.getElementById('resultsContainer');
+            resultsDiv.style.display = 'block';
+            container.innerHTML = '';
+            log('sys', `Processing ${total} image(s) with ${model}...`);
+            let done = 0;
+            document.getElementById('sendBulkBtn').disabled = true;
+            document.getElementById('sendBulkBtn2').disabled = true;
+            for (const img of selectedList) {
+                try {
+                    progressLabel.textContent = `Processing ${done + 1}/${total}: ${img.name}`;
+                    progressFill.style.width = `${Math.round((done / total) * 100)}%`;
+                    progressPct.textContent = `${Math.round((done / total) * 100)}%`;
+                    const isBase64 = img.source === 'local' || img.url.startsWith('data:');
+                    log('sys', `Analyzing: ${img.name}`);
+                    const description = await callVisionAI(model, img.url, prompt, isBase64);
+                    // Save to context_images if mode is context_images
+                    let saved = false;
+                    if (saveMode === 'context_images' && img.source !== 'local') {
+                        const { error: insertErr } = await adminClient().from('context_images').upsert({
+                            country_code: img.country_code,
+                            folder: img.folder,
+                            image_url: img.url,
+                            description: description,
+                            embedding: null,
+                            created_at: new Date().toISOString()
+                        }, { onConflict: 'image_url' });
+                        if (insertErr) {
+                            log('err', `Save to context_images failed for ${img.name}: ${insertErr.message}`);
+                        } else {
+                            saved = true;
+                            log('success', `Saved to context_images: ${img.name} (${img.country_code}/${img.folder})`);
+                        }
+                    } else if (saveMode === 'context_images' && img.source === 'local') {
+                        log('warn', `Skipping local image (no country/folder): ${img.name}`);
+                    }
+                    const card = document.createElement('div');
+                    card.className = 'result-card';
+                    const thumb = img.url.startsWith('data:') ? img.url : img.url;
+                    const savedBadge = saved ? '<span style="background:#10b981;color:white;padding:2px 8px;border-radius:20px;">✓ Saved</span>' : '';
+                    card.innerHTML = `<div class="result-header"><div style="display:flex;align-items:center;gap:10px;"><img src="${thumb}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;"><strong>${escapeHtml(img.name)}</strong> ${savedBadge}</div><span style="font-size:11px;">${model}</span></div><pre>${escapeHtml(description)}</pre>`;
+                    container.appendChild(card);
+                    // Mark as processed locally
+                    const idx = ocrImagesList.findIndex(i => i.url === img.url);
+                    if (idx > -1) ocrImagesList[idx].processed = true;
+                } catch (err) {
+                    log('err', `Failed on ${img.name}: ${err.message}`);
+                    const errCard = document.createElement('div');
+                    errCard.className = 'result-card';
+                    errCard.innerHTML = `<div class="result-header"><strong>${escapeHtml(img.name)}</strong> <span style="color:#ef4444;">Error</span></div><pre style="color:#ef4444;">${escapeHtml(err.message)}</pre>`;
+                    container.appendChild(errCard);
+                }
+                done++;
+                await new Promise(r => setTimeout(r, 500));
+            }
+            progressFill.style.width = '100%';
+            progressPct.textContent = '100%';
+            progressLabel.textContent = `✓ Completed ${total} images`;
+            log('success', `Bulk analysis complete: ${done} images processed`);
+            renderOcrGrid();
+            document.getElementById('sendBulkBtn').disabled = selectedImageUrls.size === 0;
+            document.getElementById('sendBulkBtn2').disabled = selectedImageUrls.size === 0;
+        }
+        async function processSingleImage(imageUrl) {
+            if (!adminClient()) { log('err', 'Not connected'); return; }
+            const imgMeta = ocrImagesList.find(i => i.url === imageUrl);
+            if (!imgMeta) { log('err', 'Image metadata not found'); return; }
+            const model = document.getElementById('ocrVisionModel').value;
+            const prompt = document.getElementById('bulkPrompt').value.trim();
+            const isBase64 = imgMeta.source === 'local' || imageUrl.startsWith('data:');
+            try {
+                const description = await callVisionAI(model, imageUrl, prompt, isBase64);
+                if (imgMeta.source !== 'local') {
+                    const { error } = await adminClient().from('context_images').upsert({
+                        country_code: imgMeta.country_code,
+                        folder: imgMeta.folder,
+                        image_url: imgMeta.url,
+                        description: description,
+                        embedding: null,
+                        created_at: new Date().toISOString()
+                    }, { onConflict: 'image_url' });
+                    if (error) throw error;
+                    log('success', `Saved to context_images: ${imgMeta.name}`);
+                } else {
+                    log('warn', 'Local images not saved to context_images (missing country/folder)');
+                }
+                const idx = ocrImagesList.findIndex(i => i.url === imageUrl);
+                if (idx > -1) ocrImagesList[idx].processed = true;
+                renderOcrGrid();
+            } catch (err) {
+                log('err', `Process failed: ${err.message}`);
+            }
+        }
+        function clearResults() { document.getElementById('resultsContainer').innerHTML = ''; document.getElementById('bulkResults').style.display = 'none'; document.getElementById('bulkProgress').style.display = 'none'; analysisResults = []; }
+        function exportResultsJSON() { if (!analysisResults.length) { alert('No results'); return; } const blob = new Blob([JSON.stringify(analysisResults, null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `context_analysis_${Date.now()}.json`; a.click(); }
+        async function ensureContextImagesTable() {
+            if (!adminClient()) { log('err', 'Not connected'); return; }
+            log('sys', 'Ensuring context_images table exists...');
+            const sql = `CREATE TABLE IF NOT EXISTS context_images ( id UUID DEFAULT gen_random_uuid() PRIMARY KEY, country_code TEXT, folder TEXT, image_url TEXT UNIQUE, description TEXT, embedding vector(1536) NULL, created_at TIMESTAMPTZ DEFAULT NOW() ); CREATE INDEX IF NOT EXISTS idx_context_images_country ON context_images(country_code); CREATE INDEX IF NOT EXISTS idx_context_images_folder ON context_images(folder);`;
+            const { error } = await adminClient().rpc('exec_sql', { sql });
+            if (error) {
+                log('err', `Auto-create failed: ${error.message}. Run the SQL manually from the setup box.`);
+            } else {
+                log('success', 'context_images table is ready');
+                showToast('context_images table ready', 'success');
+            }
+        }
+        async function testContextSave() {
+            if (!adminClient()) { log('err', 'Not connected'); return; }
+            const testUrl = `https://test-${Date.now()}.example.com/test.jpg`;
+            const { error } = await adminClient().from('context_images').insert({
+                country_code: 'TEST',
+                folder: 'test',
+                image_url: testUrl,
+                description: 'Test row – safe to delete'
+            });
+            if (error) {
+                log('err', `Test insert failed: ${error.message}`);
+                showToast('Test failed – check logs', 'err');
+            } else {
+                log('success', 'Test insert succeeded');
+                showToast('Test insert OK', 'success');
+            }
+        }
+        function showToast(message, type = 'success') { const existing = document.getElementById('ocrToast'); if (existing) existing.remove(); const toast = document.createElement('div'); toast.id = 'ocrToast'; const bg = type === 'success' ? '#10b981' : '#ef4444'; toast.style.cssText = `position:fixed;bottom:28px;right:28px;z-index:9999;background:${bg};color:white; padding:14px 22px;border-radius:12px;font-size:14px;font-weight:600; box-shadow:0 8px 30px rgba(0,0,0,0.25);`; toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'times-circle'}"></i> ${message}`; document.body.appendChild(toast); setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity .4s'; setTimeout(() => toast.remove(), 400); }, 4000); }
+        function escapeHtml(str) { if (!str) return ''; return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        window.onload = () => { populateLLMSelector(); loadSavedConfigIntoInputs(); if (localStorage.getItem('supabase_url') && localStorage.getItem('supabase_anon_key')) initSupabase(); else log('sys', 'Odaflux ready. Enter credentials and click Save & Connect.'); };
+    </script>
+</body>
+
+</html>
