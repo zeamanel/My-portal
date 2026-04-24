@@ -1014,19 +1014,34 @@ Return ONLY the description text (2–3 sentences max). No labels, no markdown.<
                     // Save to context_images if mode is context_images
                     let saved = false;
                     if (saveMode === 'context_images' && img.source !== 'local') {
-                        const { error: insertErr } = await adminClient().from('context_images').upsert({
-                            country_code: img.country_code,
-                            folder: img.folder,
-                            image_url: img.url,
-                            description: description,
-                            embedding: null,
-                            created_at: new Date().toISOString()
-                        }, { onConflict: 'image_url' });
-                        if (insertErr) {
-                            log('err', `Save to context_images failed for ${img.name}: ${insertErr.message}`);
+                        const { data: existing, error: checkErr } = await adminClient()
+                            .from('context_images')
+                            .select('image_url')
+                            .eq('image_url', img.url)
+                            .maybeSingle();
+                        if (checkErr && checkErr.code !== 'PGRST116') {
+                            log('err', `Check existence failed for ${img.name}: ${checkErr.message}`);
+                        }
+                        if (!existing) {
+                            const { error: insertErr } = await adminClient()
+                                .from('context_images')
+                                .insert({
+                                    country_code: img.country_code,
+                                    folder: img.folder,
+                                    image_url: img.url,
+                                    description: description,
+                                    embedding: null,
+                                    created_at: new Date().toISOString()
+                                });
+                            if (insertErr) {
+                                log('err', `Insert failed for ${img.name}: ${insertErr.message}`);
+                            } else {
+                                saved = true;
+                                log('success', `Saved to context_images: ${img.name} (${img.country_code}/${img.folder})`);
+                            }
                         } else {
+                            log('sys', `Image already exists, skipping: ${img.name}`);
                             saved = true;
-                            log('success', `Saved to context_images: ${img.name} (${img.country_code}/${img.folder})`);
                         }
                     } else if (saveMode === 'context_images' && img.source === 'local') {
                         log('warn', `Skipping local image (no country/folder): ${img.name}`);
