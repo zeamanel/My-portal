@@ -900,7 +900,7 @@ Return ONLY the description text (2–3 sentences max). No labels, no markdown.<
                             Bucket</strong> to load from oda-brain, or upload local images.</div>
                 </div>
                 <div class="setup-box"><strong>SQL for context_images table:</strong><br>
-                    <code>CREATE TABLE IF NOT EXISTS context_images ( id UUID DEFAULT gen_random_uuid() PRIMARY KEY, country_code TEXT, folder TEXT, image_url TEXT UNIQUE, description TEXT, embedding vector(768) NULL, created_at TIMESTAMPTZ DEFAULT NOW() );</code><br>
+                    <code>CREATE TABLE IF NOT EXISTS context_images ( id UUID DEFAULT gen_random_uuid() PRIMARY KEY, country_code TEXT, folder TEXT, image_url TEXT UNIQUE, description TEXT, embedding vector(3072) NULL, created_at TIMESTAMPTZ DEFAULT NOW() );</code><br>
                     <code>CREATE INDEX IF NOT EXISTS idx_context_images_country ON context_images(country_code);</code><br>
                     <code>CREATE INDEX IF NOT EXISTS idx_context_images_folder ON context_images(folder);</code>
                 </div>
@@ -944,14 +944,12 @@ Return ONLY the description text (2–3 sentences max). No labels, no markdown.<
             const key = getGeminiKey();
             if (!key) { log('warn', 'No Gemini key — embedding stored as null'); return null; }
             const configs = [
-                { model: 'gemini-embedding-2',   version: 'v1beta', dim: 768 },
-                { model: 'gemini-embedding-001',  version: 'v1beta', dim: null }
+                { model: 'gemini-embedding-2', version: 'v1beta', dim: 3072 }
             ];
             for (const config of configs) {
                 try {
                     const url = `https://generativelanguage.googleapis.com/${config.version}/models/${config.model}:embedContent?key=${key}`;
-                    const payload = { content: { parts: [{ text }] }, taskType: 'RETRIEVAL_DOCUMENT' };
-                    if (config.dim) payload.outputDimensionality = config.dim;
+                    const payload = { content: { parts: [{ text }] }, taskType: 'RETRIEVAL_DOCUMENT', outputDimensionality: config.dim };
                     const res = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1229,7 +1227,7 @@ Return ONLY the description text (2–3 sentences max). No labels, no markdown.<
         async function ensureContextImagesTable() {
             if (!adminClient()) { log('err', 'Not connected'); return; }
             log('sys', 'Ensuring context_images table exists...');
-            const sql = `CREATE TABLE IF NOT EXISTS context_images ( id UUID DEFAULT gen_random_uuid() PRIMARY KEY, country_code TEXT, folder TEXT, image_url TEXT UNIQUE, description TEXT, embedding vector(768) NULL, created_at TIMESTAMPTZ DEFAULT NOW() ); CREATE INDEX IF NOT EXISTS idx_context_images_country ON context_images(country_code); CREATE INDEX IF NOT EXISTS idx_context_images_folder ON context_images(folder);`;
+            const sql = `CREATE TABLE IF NOT EXISTS context_images ( id UUID DEFAULT gen_random_uuid() PRIMARY KEY, country_code TEXT, folder TEXT, image_url TEXT UNIQUE, description TEXT, embedding vector(3072) NULL, created_at TIMESTAMPTZ DEFAULT NOW() ); CREATE INDEX IF NOT EXISTS idx_context_images_country ON context_images(country_code); CREATE INDEX IF NOT EXISTS idx_context_images_folder ON context_images(folder);`;
             const { error } = await adminClient().rpc('exec_sql', { sql });
             if (error) {
                 log('err', `Auto-create failed: ${error.message}. Run the SQL manually from the setup box.`);
