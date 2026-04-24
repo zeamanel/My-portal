@@ -957,52 +957,48 @@ Return ONLY the description text (2–3 sentences max). No labels, no markdown.<
         async function refineSingleIdea(ideaId) { const idea = currentIdeas.find(i => i.id === ideaId); if (!idea) { const { data, error } = await adminClient().from('template_idea').select('*').eq('id', ideaId).single(); if (error || !data) { log('err', 'Could not load idea'); return; } await generateTemplateFromIdea(data.id, nextIndustry()); } else { await generateTemplateFromIdea(idea.id, nextIndustry()); } }
         async function loadPromptImages() { if (!adminClient()) return; const { data, error } = await adminClient().from('prompt_images').select('*').order('created_at', { ascending: false }); if (error) { log('err', `Prompt images error: ${error.message}`); return; } const grid = document.getElementById('promptImagesGrid'); if (!data || data.length === 0) { grid.innerHTML = '<div>No prompt images found</div>'; return; } grid.innerHTML = ''; data.forEach(img => { const card = document.createElement('div'); card.className = 'image-card'; card.innerHTML = `<div class="image-preview" style="background-image:url('${img.image_url}')"></div><div class="image-info"><strong>${(img.prompt_text || '').slice(0, 50)}</strong><div>${img.processed ? '✅ Processed' : '⏳ Pending'}</div></div>`; grid.appendChild(card); }); log('success', `Loaded ${data.length} prompt images`); }
         function scanPromptImagesBucket() { alert('Not implemented'); }
-        // ---- Core: load images from oda-brain with country + category ----
+        // ---- Recursively scan a prefix and collect image files ----
+        async function scanBucketFolder(prefix, country, folder, processedUrls, bucketImages) {
+            const { data: items, error } = await adminClient().storage.from(OCR_BUCKET).list(prefix, { limit: 1000 });
+            if (error) { log('err', `List ${OCR_BUCKET}/${prefix} error: ${error.message}`); return; }
+            if (!items || items.length === 0) return;
+            for (const item of items) {
+                if (item.name.startsWith('.')) continue;
+                const isFolder = item.metadata === null || item.id === null;
+                if (isFolder) {
+                    // recurse into subfolder — use the item's name as the folder label
+                    await scanBucketFolder(`${prefix}/${item.name}`, country, item.name, processedUrls, bucketImages);
+                } else if (item.name.match(/\.(jpg|jpeg|png|webp|jfif)$/i)) {
+                    const fullPath = `${prefix}/${item.name}`;
+                    const { data: urlData } = adminClient().storage.from(OCR_BUCKET).getPublicUrl(fullPath);
+                    const canonicalUrl = urlData.publicUrl;
+                    bucketImages.push({
+                        name: item.name,
+                        url: canonicalUrl,
+                        processed: processedUrls.has(canonicalUrl),
+                        source: 'bucket',
+                        country_code: country,
+                        folder: folder,
+                        fullPath: fullPath
+                    });
+                }
+            }
+        }
+
+        // ---- Core: load images from oda-brain with country + recursive subfolders ----
         async function loadOcrImages() {
             if (!adminClient()) return;
-            // Fetch already processed images (optional dedup)
             const { data: processedRows, error: procErr } = await adminClient().from('context_images').select('image_url');
             if (procErr) log('err', `context_images query error: ${procErr.message}`);
             const processedUrls = new Set(processedRows?.map(r => r.image_url) || []);
             const bucketImages = [];
             for (const country of COUNTRY_FOLDERS) {
-                // List all objects under the country prefix (including subfolders)
-                const { data: files, error: listErr } = await adminClient().storage.from(OCR_BUCKET).list(country, { limit: 1000 });
-                if (listErr) {
-                    log('err', `List bucket ${OCR_BUCKET}/${country} error: ${listErr.message}`);
-                    continue;
-                }
-                if (!files || files.length === 0) continue;
-                for (const file of files) {
-                    if (file.name.startsWith('.') || !file.name.match(/\.(jpg|jpeg|png|webp)$/i)) continue;
-                    // Determine category: if file is inside a subfolder, e.g., "architecture/image.jpg"
-                    let category = "general";
-                    const pathParts = file.name.split('/');
-                    if (pathParts.length > 1) {
-                        category = pathParts[0]; // first subfolder name
-                    } else {
-                        // no subfolder – we can optionally assign based on heuristics or leave as "general"
-                        category = "general";
-                    }
-                    const fullPath = `${country}/${file.name}`;
-                    const { data: urlData } = adminClient().storage.from(OCR_BUCKET).getPublicUrl(fullPath);
-                    const canonicalUrl = urlData.publicUrl;
-                    const isProcessed = processedUrls.has(canonicalUrl);
-                    bucketImages.push({
-                        name: file.name,
-                        url: canonicalUrl,
-                        processed: isProcessed,
-                        source: 'bucket',
-                        country_code: country,
-                        folder: category,
-                        fullPath: fullPath
-                    });
-                }
+                await scanBucketFolder(country, country, 'general', processedUrls, bucketImages);
             }
             const localImages = ocrImagesList.filter(i => i.source === 'local');
             ocrImagesList = [...bucketImages, ...localImages];
             filterOcrImages();
-            log('success', `Loaded ${bucketImages.length} bucket images (countries: ${COUNTRY_FOLDERS.join(', ')}) + ${localImages.length} local images`);
+            log('success', `Loaded ${bucketImages.length} bucket images across ${COUNTRY_FOLDERS.join(', ')} + ${localImages.length} local`);
         }
         function scanOcrImages() { loadOcrImages(); }
         async function handleLocalImageUploadWithFolder(event) { const files = Array.from(event.target.files); if (!files.length) return; const country = document.getElementById('uploadCountry').value; const category = document.getElementById('uploadCategory').value; const folderPath = `${country}/${category}`; if (!adminClient()) { log('err', 'Not connected to Supabase'); return; } let uploadedCount = 0; for (const file of files) { try { const ext = file.name.split('.').pop(); const uniqueName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`; const fullPath = `${folderPath}/${uniqueName}`; const { error } = await adminClient().storage.from(OCR_BUCKET).upload(fullPath, file, { cacheControl: '3600', upsert: false }); if (error) throw error; const { data: urlData } = adminClient().storage.from(OCR_BUCKET).getPublicUrl(fullPath); const publicUrl = urlData.publicUrl; ocrImagesList.push({ name: file.name, url: publicUrl, processed: false, source: 'bucket', country_code: country, folder: category, fullPath: fullPath }); uploadedCount++; log('success', `Uploaded: ${file.name} → ${country}/${category}`); } catch (err) { log('err', `Upload failed for ${file.name}: ${err.message}`); } } if (uploadedCount > 0) { filterOcrImages(); log('success', `Uploaded ${uploadedCount} image(s) to oda-brain/${folderPath}`); } event.target.value = ''; }
