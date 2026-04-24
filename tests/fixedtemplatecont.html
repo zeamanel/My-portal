@@ -943,27 +943,31 @@ Return ONLY the description text (2–3 sentences max). No labels, no markdown.<
         async function generateEmbedding(text) {
             const key = getGeminiKey();
             if (!key) { log('warn', 'No Gemini key — embedding stored as null'); return null; }
-            const modelsToTry = ['text-embedding-004', 'embedding-001'];
-            for (const modelName of modelsToTry) {
+            const configs = [
+                { model: 'text-embedding-004', version: 'v1' },
+                { model: 'text-embedding-004', version: 'v1beta' },
+                { model: 'embedding-001', version: 'v1beta' }
+            ];
+            for (const config of configs) {
                 try {
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:embedContent?key=${key}`;
+                    const url = `https://generativelanguage.googleapis.com/${config.version}/models/${config.model}:embedContent?key=${key}`;
                     const res = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ content: { parts: [{ text }] } })
+                        body: JSON.stringify({ content: { parts: [{ text }] }, taskType: 'RETRIEVAL_DOCUMENT' })
                     });
                     const data = await res.json();
-                    if (res.ok && data.embedding && data.embedding.values) {
-                        log('success', `Embedding generated using ${modelName}`);
+                    if (res.ok && data.embedding) {
+                        log('success', `Embedding: ${config.model} (${config.version})`);
                         return data.embedding.values;
                     } else {
-                        log('warn', `${modelName} failed: ${data.error?.message || 'Unknown error'}`);
+                        log('warn', `${config.model}/${config.version} failed: ${data.error?.message || 'unknown'}`);
                     }
                 } catch (err) {
-                    log('err', `Network error with ${modelName}: ${err.message}`);
+                    log('err', `Network error with ${config.model}: ${err.message}`);
                 }
             }
-            log('err', 'All embedding models failed. Storing as null.');
+            log('err', 'All embedding attempts failed — storing null');
             return null;
         }
         function isGeminiDirect(model) { return model.startsWith('gemini-'); }
