@@ -943,20 +943,28 @@ Return ONLY the description text (2–3 sentences max). No labels, no markdown.<
         async function generateEmbedding(text) {
             const key = getGeminiKey();
             if (!key) { log('warn', 'No Gemini key — embedding stored as null'); return null; }
-            try {
-                const url = `https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key=${key}`;
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ model: 'models/text-embedding-004', content: { parts: [{ text }] } })
-                });
-                if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || res.statusText); }
-                const json = await res.json();
-                return json.embedding.values; // 768 floats
-            } catch (err) {
-                log('warn', `Embedding failed: ${err.message} — storing null`);
-                return null;
+            const modelsToTry = ['text-embedding-004', 'embedding-001'];
+            for (const modelName of modelsToTry) {
+                try {
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:embedContent?key=${key}`;
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content: { parts: [{ text }] } })
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.embedding && data.embedding.values) {
+                        log('success', `Embedding generated using ${modelName}`);
+                        return data.embedding.values;
+                    } else {
+                        log('warn', `${modelName} failed: ${data.error?.message || 'Unknown error'}`);
+                    }
+                } catch (err) {
+                    log('err', `Network error with ${modelName}: ${err.message}`);
+                }
             }
+            log('err', 'All embedding models failed. Storing as null.');
+            return null;
         }
         function isGeminiDirect(model) { return model.startsWith('gemini-'); }
         async function callAI(systemPrompt, userPrompt) { const model = document.getElementById('llmSelector').value; if (!model) { log('err', 'No LLM model selected'); throw new Error('No LLM selected'); } log('sys', `callAI using model: ${model}`); if (isGeminiDirect(model)) { const key = getGeminiKey(); if (!key) throw new Error('Gemini API key missing'); const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`; const body = { contents: [{ parts: [{ text: systemPrompt + '\n\n' + userPrompt }] }], generationConfig: { temperature: 0.7, maxOutputTokens: 2048 } }; const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); if (!res.ok) { const e = await res.json(); throw new Error(`Gemini error ${res.status}: ${e.error?.message || res.statusText}`); } const json = await res.json(); return json.candidates[0].content.parts[0].text; } else { const key = getOpenrouterKey(); if (!key) throw new Error('OpenRouter key missing'); const res = await fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, messages: [{ role: 'user', content: systemPrompt + '\n\n' + userPrompt }] }) }); if (!res.ok) { let eMsg = ''; try { const e = await res.json(); eMsg = e.error?.message || ''; } catch(_) {} throw new Error(`OpenRouter error: ${res.status} ${eMsg}`); } const json = await res.json(); return json.choices[0].message.content; } }
