@@ -782,10 +782,24 @@
                     <button onclick="testContextSave()" class="btn btn-outline btn-sm" title="Insert a test row"><i
                             class="fas fa-vial"></i> Test Save</button>
                     <div class="divider"></div>
-                    <button onclick="document.getElementById('localImageUpload').click()"
-                        class="btn btn-purple btn-sm"><i class="fas fa-upload"></i> Upload Local Images</button>
-                    <input type="file" id="localImageUpload" accept="image/*" multiple style="display:none;"
-                        onchange="handleLocalImageUpload(event)">
+                    <label style="font-size:12px;color:#475569;font-weight:600;">Target Folder:</label>
+                    <select id="uploadCountry" style="background:#f1f5f9;padding:7px;border-radius:6px;">
+                        <option value="EG">EG - Egypt</option>
+                        <option value="ET" selected>ET - Ethiopia</option>
+                        <option value="KE">KE - Kenya</option>
+                        <option value="NG">NG - Nigeria</option>
+                        <option value="VN">VN - Vietnam</option>
+                    </select>
+                    <select id="uploadCategory" style="background:#f1f5f9;padding:7px;border-radius:6px;">
+                        <option value="architecture">🏛 Architecture</option>
+                        <option value="street-scenes">🏙 Street Scenes</option>
+                        <option value="fashion">👗 Fashion</option>
+                        <option value="landscapes">🌄 Landscapes</option>
+                        <option value="lifestyle">🍽 Lifestyle</option>
+                        <option value="general">📁 General</option>
+                    </select>
+                    <button onclick="document.getElementById('localImageUpload').click()" class="btn btn-purple btn-sm"><i class="fas fa-upload"></i> Upload to Selected Folder</button>
+                    <input type="file" id="localImageUpload" accept="image/*" multiple style="display:none;" onchange="handleLocalImageUploadWithFolder(event)">
                     <div class="divider"></div>
                     <button onclick="selectAllImages()" class="btn btn-outline btn-sm"><i
                             class="fas fa-check-square"></i> Select All</button>
@@ -976,7 +990,7 @@ Return ONLY the description text (2–3 sentences max). No labels, no markdown.<
             log('success', `Loaded ${bucketImages.length} bucket images (countries: ${COUNTRY_FOLDERS.join(', ')}) + ${localImages.length} local images`);
         }
         function scanOcrImages() { loadOcrImages(); }
-        function handleLocalImageUpload(event) { const files = Array.from(event.target.files); if (!files.length) return; let loaded = 0; for (const file of files) { const reader = new FileReader(); reader.onload = (e) => { const dataUrl = e.target.result; const existing = ocrImagesList.find(i => i.name === file.name && i.source === 'local'); if (!existing) ocrImagesList.push({ name: file.name, url: dataUrl, processed: false, source: 'local', country_code: null, folder: null }); loaded++; if (loaded === files.length) { renderOcrGrid(); log('success', `Loaded ${files.length} local image(s)`); } }; reader.readAsDataURL(file); } event.target.value = ''; }
+        async function handleLocalImageUploadWithFolder(event) { const files = Array.from(event.target.files); if (!files.length) return; const country = document.getElementById('uploadCountry').value; const category = document.getElementById('uploadCategory').value; const folderPath = `${country}/${category}`; if (!adminClient()) { log('err', 'Not connected to Supabase'); return; } let uploadedCount = 0; for (const file of files) { try { const ext = file.name.split('.').pop(); const uniqueName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`; const fullPath = `${folderPath}/${uniqueName}`; const { error } = await adminClient().storage.from(OCR_BUCKET).upload(fullPath, file, { cacheControl: '3600', upsert: false }); if (error) throw error; const { data: urlData } = adminClient().storage.from(OCR_BUCKET).getPublicUrl(fullPath); const publicUrl = urlData.publicUrl; ocrImagesList.push({ name: file.name, url: publicUrl, processed: false, source: 'bucket', country_code: country, folder: category, fullPath: fullPath }); uploadedCount++; log('success', `Uploaded: ${file.name} → ${country}/${category}`); } catch (err) { log('err', `Upload failed for ${file.name}: ${err.message}`); } } if (uploadedCount > 0) { renderOcrGrid(); log('success', `Uploaded ${uploadedCount} image(s) to oda-brain/${folderPath}`); } event.target.value = ''; }
         function renderOcrGrid() { const grid = document.getElementById('ocrImagesGrid'); if (!grid) return; if (ocrImagesList.length === 0) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#94a3b8;padding:40px;">No images. Scan bucket or upload local files.</div>'; return; } grid.innerHTML = ''; for (const img of ocrImagesList) { const isSelected = selectedImageUrls.has(img.url); const card = document.createElement('div'); card.className = 'image-card' + (isSelected ? ' selected' : ''); const processedBadge = img.processed ? '<span style="background:#10b981;color:white;padding:2px 8px;border-radius:20px;">✓ Processed</span>' : '<span style="background:#f97316;color:white;padding:2px 8px;border-radius:20px;">⏳ Pending</span>'; const sourceBadge = img.source === 'local' ? '<span style="background:#8b5cf6;color:white;padding:2px 6px;border-radius:10px;">Local</span>' : `<span style="background:#0ea5e9;color:white;padding:2px 6px;border-radius:10px;">${img.country_code || '?'}/${img.folder || '?'}</span>`; const checkClass = isSelected ? 'checked' : ''; card.innerHTML = `<div class="image-preview" style="background-image:url('${img.url}')" onclick="toggleImageSelection('${img.url}')"><div class="image-select-overlay ${checkClass}" onclick="toggleImageSelection('${img.url}');event.stopPropagation()"></div></div><div class="image-info"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><strong style="font-size:12px;">${escapeHtml(img.name)}</strong>${sourceBadge}</div><div style="display:flex;justify-content:space-between;">${processedBadge}${!img.processed ? `<button class="btn btn-primary btn-sm" onclick="processSingleImage('${img.url}')"><i class="fas fa-magic"></i> Process</button>` : ''}</div></div>`; grid.appendChild(card); } updateSelectionUI(); }
         function toggleImageSelection(url) { if (selectedImageUrls.has(url)) selectedImageUrls.delete(url); else selectedImageUrls.add(url); renderOcrGrid(); }
         function selectAllImages() { ocrImagesList.forEach(i => selectedImageUrls.add(i.url)); renderOcrGrid(); }
