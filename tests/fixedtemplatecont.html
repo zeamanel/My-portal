@@ -944,7 +944,7 @@ Return ONLY the description text (2–3 sentences max). No labels, no markdown.<
             const key = getGeminiKey();
             if (!key) { log('warn', 'No Gemini key — embedding stored as null'); return null; }
             try {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${key}`;
+                const url = `https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key=${key}`;
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
