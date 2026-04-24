@@ -622,7 +622,6 @@
                     style="width:170px;"></div>
             <div><label>OpenRouter Key</label><input type="password" id="openrouterKey" placeholder="sk-or-..."
                     style="width:160px;"></div>
-            <div><label>OpenAI Key <span style="color:#94a3b8;font-size:9px;">(embeddings)</span></label><input type="password" id="openaiKey" placeholder="sk-..." style="width:160px;"></div>
             <div><label>LLM Model</label><select id="llmSelector"
                     style="background:#334155;color:white;border:none;padding:8px;border-radius:6px;width:220px;"></select>
             </div>
@@ -901,7 +900,7 @@ Return ONLY the description text (2–3 sentences max). No labels, no markdown.<
                             Bucket</strong> to load from oda-brain, or upload local images.</div>
                 </div>
                 <div class="setup-box"><strong>SQL for context_images table:</strong><br>
-                    <code>CREATE TABLE IF NOT EXISTS context_images ( id UUID DEFAULT gen_random_uuid() PRIMARY KEY, country_code TEXT, folder TEXT, image_url TEXT UNIQUE, description TEXT, embedding vector(1536) NULL, created_at TIMESTAMPTZ DEFAULT NOW() );</code><br>
+                    <code>CREATE TABLE IF NOT EXISTS context_images ( id UUID DEFAULT gen_random_uuid() PRIMARY KEY, country_code TEXT, folder TEXT, image_url TEXT UNIQUE, description TEXT, embedding vector(768) NULL, created_at TIMESTAMPTZ DEFAULT NOW() );</code><br>
                     <code>CREATE INDEX IF NOT EXISTS idx_context_images_country ON context_images(country_code);</code><br>
                     <code>CREATE INDEX IF NOT EXISTS idx_context_images_folder ON context_images(folder);</code>
                 </div>
@@ -935,25 +934,25 @@ Return ONLY the description text (2–3 sentences max). No labels, no markdown.<
         function isSupabaseLoaded() { return typeof window.supabase !== 'undefined' && typeof window.supabase.createClient === 'function'; }
         async function testSupabaseConnection(client) { try { const { error } = await client.from('ai_models').select('id').limit(1); if (error) throw error; return true; } catch (e) { log('err', `Connection test failed: ${e.message}`); return false; } }
         async function initSupabase() { const url = document.getElementById('supabaseUrl').value.trim(); const anonKey = document.getElementById('supabaseKey').value.trim(); const serviceKey = document.getElementById('supabaseServiceKey').value.trim(); if (!url || !anonKey) { log('err', 'Supabase URL and Anon Key are required'); updateConnectionStatus(false, 'Missing credentials'); return false; } if (!isSupabaseLoaded()) { log('err', 'Supabase JS not loaded'); return false; } try { supabaseClient = window.supabase.createClient(url, anonKey); supabaseAdminClient = serviceKey ? window.supabase.createClient(url, serviceKey) : null; const ok = await testSupabaseConnection(adminClient()); if (ok) { updateConnectionStatus(true, 'Connected'); log('success', 'Supabase connected'); loadDashboard(); loadIdeas(); loadHistory(); loadSavedRawIdeas(); return true; } else { updateConnectionStatus(false, 'Connection failed'); return false; } } catch (err) { log('err', `Supabase init error: ${err.message}`); updateConnectionStatus(false, 'Error'); return false; } }
-        function saveConfig() { const url = document.getElementById('supabaseUrl').value.trim(); const anonKey = document.getElementById('supabaseKey').value.trim(); const serviceKey = document.getElementById('supabaseServiceKey').value.trim(); const geminiKey = document.getElementById('geminiKey').value.trim(); const orKey = document.getElementById('openrouterKey').value.trim(); const oaiKey = document.getElementById('openaiKey').value.trim(); if (!url || !anonKey) { log('err', 'Supabase URL and Anon Key required'); return; } localStorage.setItem('supabase_url', url); localStorage.setItem('supabase_anon_key', anonKey); serviceKey ? localStorage.setItem('supabase_service_key', serviceKey) : localStorage.removeItem('supabase_service_key'); geminiKey ? localStorage.setItem('gemini_key', geminiKey) : localStorage.removeItem('gemini_key'); orKey ? localStorage.setItem('openrouter_key', orKey) : localStorage.removeItem('openrouter_key'); oaiKey ? localStorage.setItem('openai_key', oaiKey) : localStorage.removeItem('openai_key'); initSupabase(); }
-        function loadSavedConfigIntoInputs() { const fields = { supabaseUrl: 'supabase_url', supabaseKey: 'supabase_anon_key', supabaseServiceKey: 'supabase_service_key', geminiKey: 'gemini_key', openrouterKey: 'openrouter_key', openaiKey: 'openai_key' }; for (const [id, key] of Object.entries(fields)) { const v = localStorage.getItem(key); if (v) document.getElementById(id).value = v; } }
+        function saveConfig() { const url = document.getElementById('supabaseUrl').value.trim(); const anonKey = document.getElementById('supabaseKey').value.trim(); const serviceKey = document.getElementById('supabaseServiceKey').value.trim(); const geminiKey = document.getElementById('geminiKey').value.trim(); const orKey = document.getElementById('openrouterKey').value.trim(); if (!url || !anonKey) { log('err', 'Supabase URL and Anon Key required'); return; } localStorage.setItem('supabase_url', url); localStorage.setItem('supabase_anon_key', anonKey); serviceKey ? localStorage.setItem('supabase_service_key', serviceKey) : localStorage.removeItem('supabase_service_key'); geminiKey ? localStorage.setItem('gemini_key', geminiKey) : localStorage.removeItem('gemini_key'); orKey ? localStorage.setItem('openrouter_key', orKey) : localStorage.removeItem('openrouter_key'); initSupabase(); }
+        function loadSavedConfigIntoInputs() { const fields = { supabaseUrl: 'supabase_url', supabaseKey: 'supabase_anon_key', supabaseServiceKey: 'supabase_service_key', geminiKey: 'gemini_key', openrouterKey: 'openrouter_key' }; for (const [id, key] of Object.entries(fields)) { const v = localStorage.getItem(key); if (v) document.getElementById(id).value = v; } }
         function populateLLMSelector() { const select = document.getElementById('llmSelector'); select.innerHTML = ''; const groups = [{ label: '── Gemini Direct ──', models: [{ value: 'gemini-3.1-pro-preview', label: '⭐ Gemini 3.1 Pro Preview' }, { value: 'gemini-3.1-flash-preview', label: 'Gemini 3.1 Flash Preview' }, { value: 'gemini-3.1-flash-lite-preview', label: 'Gemini 3.1 Flash-Lite Preview' }, { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' }, { value: 'gemini-1.5-pro-latest', label: 'Gemini 1.5 Pro' }] }, { label: '── Via OpenRouter ──', models: [{ value: 'openai/gpt-4o', label: 'GPT-4o' }] }]; for (const group of groups) { const og = document.createElement('optgroup'); og.label = group.label; for (const m of group.models) { const opt = document.createElement('option'); opt.value = m.value; opt.textContent = m.label; if (m.value === 'gemini-2.0-flash') opt.selected = true; og.appendChild(opt); } select.appendChild(og); } }
         function switchTab(n) { document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.querySelectorAll('.tab').forEach(el => el.classList.remove('active')); document.getElementById('tab' + n).classList.add('active'); document.querySelectorAll('.tab')[n].classList.add('active'); if (n === 5 && adminClient()) loadOcrImages(); }
         function getGeminiKey() { return localStorage.getItem('gemini_key') || document.getElementById('geminiKey').value.trim(); }
         function getOpenrouterKey() { return localStorage.getItem('openrouter_key') || document.getElementById('openrouterKey').value.trim(); }
-        function getOpenAIKey() { return localStorage.getItem('openai_key') || document.getElementById('openaiKey').value.trim(); }
         async function generateEmbedding(text) {
-            const key = getOpenAIKey();
-            if (!key) { log('warn', 'No OpenAI key — embedding stored as null'); return null; }
+            const key = getGeminiKey();
+            if (!key) { log('warn', 'No Gemini key — embedding stored as null'); return null; }
             try {
-                const res = await fetch('https://api.openai.com/v1/embeddings', {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${key}`;
+                const res = await fetch(url, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ input: text, model: 'text-embedding-3-small' })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model: 'models/text-embedding-004', content: { parts: [{ text }] } })
                 });
                 if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || res.statusText); }
                 const json = await res.json();
-                return json.data[0].embedding;
+                return json.embedding.values; // 768 floats
             } catch (err) {
                 log('warn', `Embedding failed: ${err.message} — storing null`);
                 return null;
@@ -1217,7 +1216,7 @@ Return ONLY the description text (2–3 sentences max). No labels, no markdown.<
         async function ensureContextImagesTable() {
             if (!adminClient()) { log('err', 'Not connected'); return; }
             log('sys', 'Ensuring context_images table exists...');
-            const sql = `CREATE TABLE IF NOT EXISTS context_images ( id UUID DEFAULT gen_random_uuid() PRIMARY KEY, country_code TEXT, folder TEXT, image_url TEXT UNIQUE, description TEXT, embedding vector(1536) NULL, created_at TIMESTAMPTZ DEFAULT NOW() ); CREATE INDEX IF NOT EXISTS idx_context_images_country ON context_images(country_code); CREATE INDEX IF NOT EXISTS idx_context_images_folder ON context_images(folder);`;
+            const sql = `CREATE TABLE IF NOT EXISTS context_images ( id UUID DEFAULT gen_random_uuid() PRIMARY KEY, country_code TEXT, folder TEXT, image_url TEXT UNIQUE, description TEXT, embedding vector(768) NULL, created_at TIMESTAMPTZ DEFAULT NOW() ); CREATE INDEX IF NOT EXISTS idx_context_images_country ON context_images(country_code); CREATE INDEX IF NOT EXISTS idx_context_images_folder ON context_images(folder);`;
             const { error } = await adminClient().rpc('exec_sql', { sql });
             if (error) {
                 log('err', `Auto-create failed: ${error.message}. Run the SQL manually from the setup box.`);
