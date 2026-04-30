@@ -192,10 +192,15 @@ async def next_image(user=Depends(get_current_user)):
 
 # ==================== Template Factory Endpoints ====================
 @app.post("/api/template/stage1")
-async def stage1_generate_ideas(user=Depends(get_current_user)):
+async def stage1_generate_ideas(request: Request, user=Depends(get_current_user)):
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
     system = "You are an expert product manager. Generate 5 fresh template ideas for an AI image/video generation platform, focusing on Ethiopian and African cultural themes. Return ONLY a valid JSON array with fields: title, description, media_type (Image/Video/Audio)."
     user_prompt = "Generate creative template ideas for the Ethiopian market."
-    model = "gemini-3.1-flash-preview"
+    model = body.get("model") or "gemini-3.1-flash-preview"
     try:
         ai_text = await call_llm(model, system, user_prompt, temperature=0.8)
         # extract JSON
@@ -220,6 +225,7 @@ async def stage1_generate_ideas(user=Depends(get_current_user)):
 async def stage2_convert_ideas(request: Request, user=Depends(get_current_user)):
     body = await request.json()
     idea_ids = body.get("idea_ids", [])
+    stage2_model = body.get("model") or "gemini-3.1-flash-preview"
     if not idea_ids:
         raise HTTPException(400, "No idea IDs")
     import json as _json
@@ -242,7 +248,7 @@ async def stage2_convert_ideas(request: Request, user=Depends(get_current_user))
             # Pass 1: creative brief
             sys_prompt = "You are a senior creative director. Write a creative brief for this template idea."
             usr_prompt = f"Idea: {idea['title']}\n{idea['description']}\nMedia: {idea['media_type']}"
-            brief = await call_llm("gemini-3.1-flash-preview", sys_prompt, usr_prompt, temperature=0.7)
+            brief = await call_llm(stage2_model, sys_prompt, usr_prompt, temperature=0.7)
 
             # Pass 2: structured template JSON
             sys2 = (
@@ -251,7 +257,7 @@ async def stage2_convert_ideas(request: Request, user=Depends(get_current_user))
                 "fields (array of objects with: field_name, field_label, field_type, placeholder, is_required)."
             )
             usr2 = f"Brief:\n{brief}\nMedia type: {idea['media_type']}"
-            raw_json = await call_llm("gemini-3.1-flash-preview", sys2, usr2, temperature=0.5)
+            raw_json = await call_llm(stage2_model, sys2, usr2, temperature=0.5)
 
             enriched = extract_json_obj(raw_json)
 

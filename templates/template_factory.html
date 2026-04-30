@@ -107,7 +107,12 @@
     <div class="card">
         <h2><i class="fas fa-lightbulb"></i> Stage 1 — Generate Ideas</h2>
         <p style="font-size:13px;color:#64748b;margin-bottom:14px;">Ask AI to produce fresh template ideas and save them to <code>template_idea</code>.</p>
-        <div class="toolbar">
+        <div class="toolbar" style="flex-wrap:wrap;gap:8px;">
+            <select id="stageModel" style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 10px;font-size:13px;">
+                <option value="gemini-3.1-flash-preview" selected>Gemini 3.1 Flash</option>
+                <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite</option>
+                <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
+            </select>
             <button class="btn btn-primary" onclick="runStage1()" id="stage1Btn"><i class="fas fa-magic"></i> Generate 5 Ideas</button>
             <button class="btn btn-outline btn-sm" onclick="loadIdeas()"><i class="fas fa-sync"></i> Refresh</button>
             <span id="ideasCount" style="font-size:12px;color:#64748b;"></span>
@@ -278,9 +283,10 @@
     async function runStage1() {
         const btn = document.getElementById('stage1Btn');
         btn.disabled = true;
-        log('Calling Stage 1 — generating ideas…');
+        const stageModel = document.getElementById('stageModel').value;
+        log(`Calling Stage 1 — generating ideas… (${stageModel})`);
         try {
-            const data = await api('POST', '/api/template/stage1');
+            const data = await api('POST', '/api/template/stage1', { model: stageModel });
             log(`Stage 1 complete: ${data.count} ideas saved`, 'success');
             await loadIdeas();
         } catch (e) { log(`Stage 1 failed: ${e.message}`, 'error'); }
@@ -364,7 +370,8 @@
         try {
             document.getElementById('stage2Fill').style.width = '30%';
             document.getElementById('stage2Label').textContent = 'AI is building templates…';
-            const data = await api('POST', '/api/template/stage2', { idea_ids: ids });
+            const stageModel = document.getElementById('stageModel').value;
+            const data = await api('POST', '/api/template/stage2', { idea_ids: ids, model: stageModel });
             document.getElementById('stage2Fill').style.width = '100%';
             document.getElementById('stage2Label').textContent = 'Done';
             const errs = data.errors || [];
