@@ -84,7 +84,7 @@ async def call_llm(model_name: str, system_prompt: str, user_prompt: str, image_
             import base64
             img_data = base64.b64decode(image_base64)
             parts.append(types.Part.from_bytes(data=img_data, mime_type="image/jpeg"))
-        response = await client.models.generate_content(
+        response = await client.aio.models.generate_content(
             model=model_name,
             contents=parts,
             config={"temperature": temperature}
@@ -547,14 +547,14 @@ async def analyze_images(request: Request, user=Depends(get_current_user)):
                 img_bytes = resp.content
                 mime = resp.headers.get("content-type", "image/jpeg")
             parts = [types.Part.from_bytes(data=img_bytes, mime_type=mime)]
-            response = await client.models.generate_content(
+            response = await client.aio.models.generate_content(
                 model=model,
                 contents=parts + [prompt],
                 config={"temperature": 0.4}
             )
             description = response.text.strip()
             # Generate embedding
-            embed_response = await client.models.embed_content(
+            embed_response = await client.aio.models.embed_content(
                 model="models/gemini-embedding-2",
                 contents=description,
                 config=types.EmbedContentConfig(output_dimensionality=3072)
@@ -635,7 +635,7 @@ async def analyze_single_image(request: Request, user=Depends(get_current_user))
             img_bytes = resp.content
             mime = resp.headers.get("content-type", "image/jpeg")
         parts = [types.Part.from_bytes(data=img_bytes, mime_type=mime)]
-        response = await client.models.generate_content(
+        response = await client.aio.models.generate_content(
             model=model,
             contents=parts + [prompt],
             config={"temperature": 0.4}
@@ -643,7 +643,7 @@ async def analyze_single_image(request: Request, user=Depends(get_current_user))
         description = response.text.strip()
 
         # Generate embedding
-        embed_response = await client.models.embed_content(
+        embed_response = await client.aio.models.embed_content(
             model="models/gemini-embedding-2",
             contents=description,
             config=types.EmbedContentConfig(output_dimensionality=3072)
