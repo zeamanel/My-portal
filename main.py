@@ -222,54 +222,67 @@ async def stage2_convert_ideas(request: Request, user=Depends(get_current_user))
     idea_ids = body.get("idea_ids", [])
     if not idea_ids:
         raise HTTPException(400, "No idea IDs")
-    # Fetch ideas
+    import json as _json
+
+    def extract_json_obj(text: str) -> dict:
+        """Strip markdown fences then parse the first {...} block."""
+        # Remove ```json ... ``` or ``` ... ``` fences
+        text = re.sub(r'```(?:json)?\s*', '', text).replace('```', '')
+        match = re.search(r'\{[\s\S]*\}', text)
+        if not match:
+            raise ValueError("No JSON object found in AI response")
+        return _json.loads(match.group())
+
     res = supabase.table("template_idea").select("*").in_("id", idea_ids).execute()
     ideas = res.data
     created = 0
+    errors = []
     for idea in ideas:
-        # Call AI to enrich
-        sys_prompt = "You are a senior creative director. Write a creative brief for this template idea."
-        usr_prompt = f"Idea: {idea['title']}\n{idea['description']}\nMedia: {idea['media_type']}"
-        brief = await call_llm("gemini-3.1-flash-preview", sys_prompt, usr_prompt, temperature=0.7)
-        # Second call: generate template JSON
-        sys2 = "You are an AI prompt engineer. Return a JSON object with title, description, prompt_template (using {{placeholders}}), and fields array."
-        usr2 = f"Brief: {brief}\nMedia: {idea['media_type']}"
-        raw_json = await call_llm("gemini-3.1-flash-preview", sys2, usr2, temperature=0.7)
-        # extract JSON
-        match = re.search(r'\{[\s\S]*\}', raw_json)
-        if not match:
-            continue
-        import json
-        enriched = json.loads(match.group())
-        # Insert template
-        tpl_data = {
-            "title": enriched.get("title", idea["title"]),
-            "description": enriched.get("description", idea["description"]),
-            "prompt_template": enriched.get("prompt_template", idea["description"]),
-            "media_type": idea["media_type"],
-            "is_published": False,
-            "creator_id": "cf47617f-a205-46ab-9268-d8b816a54758",  # default admin user
-            "base_price_tokens": 10
-        }
-        tpl_res = supabase.table("creator_templates").insert(tpl_data).select("id").execute()
-        if tpl_res.data:
-            template_id = tpl_res.data[0]["id"]
-            # Create fields
-            fields = enriched.get("fields", [])
-            for idx, field in enumerate(fields):
-                supabase.table("template_fields").insert({
-                    "template_id": template_id,
-                    "field_name": field.get("field_name", f"field_{idx}"),
-                    "field_label": field.get("field_label", field.get("field_name")),
-                    "field_type": field.get("field_type", "text"),
-                    "placeholder": field.get("placeholder", ""),
-                    "is_required": field.get("is_required", True),
-                    "display_order": idx
-                }).execute()
-            created += 1
-            # Mark idea as processed
-            supabase.table("template_idea").update({"stage": "processed"}).eq("id", idea["id"]).execute()
-    return {"created": created}
+        try:
+            # Pass 1: creative brief
+            sys_prompt = "You are a senior creative director. Write a creative brief for this template idea."
+            usr_prompt = f"Idea: {idea['title']}\n{idea['description']}\nMedia: {idea['media_type']}"
+            brief = await call_llm("gemini-3.1-flash-preview", sys_prompt, usr_prompt, temperature=0.7)
+
+            # Pass 2: structured template JSON
+            sys2 = (
+                "You are an AI prompt engineer. Return ONLY a valid JSON object (no markdown, no explanation) with these keys: "
+                "title (string), description (string), prompt_template (string with {{placeholders}}), "
+                "fields (array of objects with: field_name, field_label, field_type, placeholder, is_required)."
+            )
+            usr2 = f"Brief:\n{brief}\nMedia type: {idea['media_type']}"
+            raw_json = await call_llm("gemini-3.1-flash-preview", sys2, usr2, temperature=0.5)
+
+            enriched = extract_json_obj(raw_json)
+
+            tpl_data = {
+                "title": enriched.get("title") or idea["title"],
+                "description": enriched.get("description") or idea.get("description", ""),
+                "prompt_template": enriched.get("prompt_template") or idea.get("description", ""),
+                "media_type": idea.get("media_type", "Image"),
+                "is_published": False,
+                "creator_id": "cf47617f-a205-46ab-9268-d8b816a54758",
+                "base_price_tokens": 10
+            }
+            tpl_res = supabase.table("creator_templates").insert(tpl_data).select("id").execute()
+            if tpl_res.data:
+                template_id = tpl_res.data[0]["id"]
+                for idx, field in enumerate(enriched.get("fields", [])):
+                    supabase.table("template_fields").insert({
+                        "template_id": template_id,
+                        "field_name": field.get("field_name", f"field_{idx}"),
+                        "field_label": field.get("field_label") or field.get("field_name", f"Field {idx}"),
+                        "field_type": field.get("field_type", "text"),
+                        "placeholder": field.get("placeholder", ""),
+                        "is_required": bool(field.get("is_required", True)),
+                        "display_order": idx
+                    }).execute()
+                supabase.table("template_idea").update({"stage": "processed"}).eq("id", idea["id"]).execute()
+                created += 1
+        except Exception as e:
+            errors.append({"idea_id": idea.get("id"), "error": str(e)})
+
+    return {"created": created, "errors": errors}
 
 # ==================== Template CRUD & Test Endpoints ====================
 @app.get("/api/templates")
