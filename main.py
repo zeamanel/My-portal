@@ -271,6 +271,67 @@ async def stage2_convert_ideas(request: Request, user=Depends(get_current_user))
             supabase.table("template_idea").update({"stage": "processed"}).eq("id", idea["id"]).execute()
     return {"created": created}
 
+# ==================== Template CRUD & Test Endpoints ====================
+@app.get("/api/templates")
+async def list_templates(published: Optional[bool] = None, user=Depends(get_current_user)):
+    query = supabase.table("creator_templates").select(
+        "id, title, description, media_type, is_published, before_image_url, after_image_url, prompt_template, created_at"
+    ).order("created_at", desc=True)
+    if published is not None:
+        query = query.eq("is_published", published)
+    res = query.execute()
+    return {"templates": res.data}
+
+@app.get("/api/templates/{template_id}")
+async def get_template(template_id: str, user=Depends(get_current_user)):
+    tpl_res = supabase.table("creator_templates").select("*").eq("id", template_id).execute()
+    if not tpl_res.data:
+        raise HTTPException(404, "Template not found")
+    fields_res = supabase.table("template_fields").select("*").eq("template_id", template_id).order("display_order").execute()
+    return {"template": tpl_res.data[0], "fields": fields_res.data}
+
+@app.patch("/api/templates/{template_id}")
+async def update_template(template_id: str, request: Request, user=Depends(get_current_user)):
+    data = await request.json()
+    allowed = ["before_image_url", "after_image_url", "is_published", "title", "description"]
+    update_data = {k: v for k, v in data.items() if k in allowed}
+    if not update_data:
+        raise HTTPException(400, "No valid fields to update")
+    res = supabase.table("creator_templates").update(update_data).eq("id", template_id).execute()
+    return {"template": res.data[0] if res.data else {}}
+
+@app.post("/api/template/test")
+async def test_template_generation(request: Request, user=Depends(get_current_user)):
+    body = await request.json()
+    template_id = body.get("template_id")
+    field_values = body.get("field_values", {})
+    model = body.get("model", "gemini-3.1-flash-preview")
+    if not template_id:
+        raise HTTPException(400, "template_id required")
+    tpl_res = supabase.table("creator_templates").select("*").eq("id", template_id).execute()
+    if not tpl_res.data:
+        raise HTTPException(404, "Template not found")
+    template = tpl_res.data[0]
+    # Build final prompt by replacing {{placeholders}}
+    prompt = template.get("prompt_template", "")
+    for key, value in field_values.items():
+        prompt = prompt.replace(f"{{{{{key}}}}}", value)
+    # Refine the prompt with LLM
+    sys_prompt = "You are an expert AI image prompt engineer. Enhance this prompt for high-quality AI image generation. Return ONLY the enhanced prompt text, no labels or explanation."
+    try:
+        refined = await call_llm(model, sys_prompt, prompt, temperature=0.7)
+    except Exception as e:
+        refined = prompt  # fallback: return raw prompt
+    return {"final_prompt": prompt, "refined_prompt": refined}
+
+@app.get("/api/template/ideas")
+async def list_ideas(stage: Optional[str] = None, user=Depends(get_current_user)):
+    query = supabase.table("template_idea").select("*").order("created_at", desc=True)
+    if stage:
+        query = query.eq("stage", stage)
+    res = query.execute()
+    return {"ideas": res.data}
+
 # ==================== Admin Endpoints ====================
 @app.get("/api/admin/agents")
 async def admin_list_agents(admin=Depends(admin_required)):
