@@ -367,8 +367,13 @@
             const data = await api('POST', '/api/template/stage2', { idea_ids: ids });
             document.getElementById('stage2Fill').style.width = '100%';
             document.getElementById('stage2Label').textContent = 'Done';
-            document.getElementById('stage2Result').innerHTML = `<span style="color:#4ade80;font-size:13px;"><i class="fas fa-check-circle"></i> Created ${data.created} template(s)</span>`;
-            log(`Stage 2 complete: ${data.created} templates created`, 'success');
+            const errs = data.errors || [];
+            const color = data.created > 0 ? '#4ade80' : '#fbbf24';
+            const icon  = data.created > 0 ? 'fa-check-circle' : 'fa-exclamation-triangle';
+            document.getElementById('stage2Result').innerHTML =
+                `<span style="color:${color};font-size:13px;"><i class="fas ${icon}"></i> Created ${data.created} template(s)${errs.length ? `, ${errs.length} failed` : ''}</span>`;
+            log(`Stage 2 complete: ${data.created} created, ${errs.length} errors`, data.created > 0 ? 'success' : 'warn');
+            errs.forEach(e => log(`  ✗ idea ${e.idea_id}: ${e.error}`, 'error'));
             selectedIdeaIds.clear();
             await loadIdeas();
         } catch (e) {

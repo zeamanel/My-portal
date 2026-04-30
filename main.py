@@ -87,7 +87,7 @@ async def call_llm(model_name: str, system_prompt: str, user_prompt: str, image_
         response = await client.aio.models.generate_content(
             model=model_name,
             contents=parts,
-            config={"temperature": temperature}
+            config=types.GenerateContentConfig(temperature=temperature)
         )
         return response.text
     else:
@@ -563,7 +563,7 @@ async def analyze_images(request: Request, user=Depends(get_current_user)):
             response = await client.aio.models.generate_content(
                 model=model,
                 contents=parts + [prompt],
-                config={"temperature": 0.4}
+                config=types.GenerateContentConfig(temperature=0.4)
             )
             description = response.text.strip()
             # Generate embedding
@@ -651,7 +651,7 @@ async def analyze_single_image(request: Request, user=Depends(get_current_user))
         response = await client.aio.models.generate_content(
             model=model,
             contents=parts + [prompt],
-            config={"temperature": 0.4}
+            config=types.GenerateContentConfig(temperature=0.4)
         )
         description = response.text.strip()
 
