@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Prompts – Context Images Builder</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            color: #334155;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: #38bdf8;
+            color: white;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid #64748b;
+            color: #64748b;
+        }
+
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: 12px;
+        }
+
+        .btn-purple {
+            background: #8b5cf6;
+            color: white;
+        }
+
+        .ocr-toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            background: #f8fafc;
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+        }
+
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .image-card {
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #f8fafc;
+            transition: all 0.2s;
+        }
+
+        .image-card.selected {
+            border-color: #38bdf8;
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.3);
+        }
+
+        .image-preview {
+            height: 180px;
+            background-size: cover;
+            background-position: center;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .image-select-overlay {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #cbd5e1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .image-select-overlay.checked {
+            background: #38bdf8;
+            border-color: #38bdf8;
+        }
+
+        .image-select-overlay.checked::after {
+            content: '✓';
+            color: white;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .image-info {
+            padding: 10px;
+        }
+
+        .bulk-panel {
+            background: linear-gradient(135deg, #0f172a, #1e3a5f);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            color: white;
+            display: none;
+        }
+
+        .bulk-panel.visible {
+            display: block;
+        }
+
+        .progress-bar-wrap {
+            background: #e2e8f0;
+            border-radius: 999px;
+            overflow: hidden;
+            height: 8px;
+        }
+
+        .progress-bar-fill {
+            background: linear-gradient(90deg, #38bdf8, #10b981);
+            height: 100%;
+            transition: width 0.3s;
+        }
+
+        .log-container {
+            background: #1e293b;
+            color: #67e8f9;
+            font-family: monospace;
+            padding: 15px;
+            border-radius: 12px;
+            height: 200px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+
+        .result-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+
+        .setup-box {
+            background: #f1f5f9;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <h2><i class="fas fa-robot"></i> Context Images Builder</h2>
+            <p style="color:#64748b;">Scan <code>oda-brain</code> bucket, analyze images with AI, and save to
+                <code>context_images</code>.</p>
+
+            <div class="ocr-toolbar">
+                <button onclick="scanBucket()" class="btn btn-primary btn-sm"><i class="fas fa-search"></i> Scan
+                    Bucket</button>
+                <button onclick="document.getElementById('localImageUpload').click()" class="btn btn-purple btn-sm"><i
+                        class="fas fa-upload"></i> Upload</button>
+                <input type="file" id="localImageUpload" accept="image/*" multiple style="display:none;"
+                    onchange="uploadImages(event)">
+                <div class="divider"></div>
+                <label>Country:</label>
+                <select id="uploadCountry">
+                    <option value="EG">EG</option>
+                    <option value="ET" selected>ET</option>
+                    <option value="KE">KE</option>
+                    <option value="NG">NG</option>
+                    <option value="VN">VN</option>
+                </select>
+                <select id="uploadCategory">
+                    <option value="architecture">Architecture</option>
+                    <option value="street-scenes">Street Scenes</option>
+                    <option value="fashion">Fashion</option>
+                    <option value="landscapes">Landscapes</option>
+                    <option value="lifestyle">Lifestyle</option>
+                    <option value="general">General</option>
+                </select>
+                <input type="text" id="newFolderInput" placeholder="New folder" style="width:120px;">
+                <button onclick="addCustomFolder()" class="btn btn-outline btn-sm">+ Add</button>
+                <div class="divider"></div>
+                <label>Filter Country:</label>
+                <select id="countryFilter" onchange="filterImages()">
+                    <option value="all">All</option>
+                    <option value="EG">EG</option>
+                    <option value="ET">ET</option>
+                    <option value="KE">KE</option>
+                    <option value="NG">NG</option>
+                    <option value="VN">VN</option>
+                </select>
+                <select id="folderFilter" onchange="renderGrid()">
+                    <option value="all">All Folders</option>
+                </select>
+                <button onclick="selectAll()" class="btn btn-outline btn-sm">Select All</button>
+                <button onclick="deselectAll()" class="btn btn-outline btn-sm">Deselect</button>
+                <span id="selectionCounter">0 selected</span>
+                <div class="divider"></div>
+                <label>Model:</label>
+                <select id="visionModel">
+                    <option value="gemini-3.1-flash-preview">Gemini 3.1 Flash</option>
+                    <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
+                </select>
+                <button onclick="analyzeSelected()" class="btn btn-success btn-sm" id="analyzeBtn" disabled><i
+                        class="fas fa-paper-plane"></i> Analyze & Store</button>
+            </div>
+
+            <div class="bulk-panel" id="bulkPanel">
+                <h3>Bulk Analysis <span id="bulkCount">0</span></h3>
+                <textarea id="analysisPrompt" rows="2"
+                    style="width:100%">Describe this image in detail for cultural context (architecture, street life, clothing, etc.). Return a concise paragraph (2-3 sentences).</textarea>
+                <div id="bulkProgress" style="margin-top:10px; display:none;">
+                    <div><span id="progressLabel">Processing 0/0</span> <span id="progressPercent">0%</span></div>
+                    <div class="progress-bar-wrap">
+                        <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="bulkResults" style="display:none; margin-top:20px;">
+                <h3>Results</h3>
+                <div id="resultsContainer"></div>
+            </div>
+
+            <div id="imageGrid" class="image-grid">
+                <div style="grid-column:1/-1; text-align:center;">Click "Scan Bucket" to load images.</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Logs</h2>
+            <div class="log-container" id="logContainer"></div>
+            <button onclick="clearLogs()" class="btn btn-outline btn-sm" style="margin-top:8px;">Clear</button>
+        </div>
+    </div>
+
+    <script>
+        // Supabase client for auth (only to get JWT)
+        const supabaseUrl = "https://vjcumvumnnvgncnbbtzk.supabase.co";
+        const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqY3VtdnVtbm52Z25jbmJidHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5MjQwOTMsImV4cCI6MjA4MzUwMDA5M30.6YtPHl9EXnRNDtdUIMkNbLLyUvuk9hG3k1gHjn14qd4";
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+        let currentUser = null;
+        let images = [];
+        let selectedUrls = new Set();
+
+        async function getToken() {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                window.location.href = '/';
+                throw new Error("Not authenticated");
+            }
+            return session.access_token;
+        }
+
+        function log(msg, type = 'info') {
+            const logDiv = document.getElementById('logContainer');
+            const time = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#f87171' : (type === 'success' ? '#4ade80' : '#67e8f9');
+            logDiv.innerHTML += `<div><span style="color:#94a3b8">[${time}]</span> <span style="color:${color}">${msg}</span></div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        function clearLogs() { document.getElementById('logContainer').innerHTML = ''; }
+
+        async function scanBucket() {
+            log("Scanning bucket...");
+            try {
+                const token = await getToken();
+                const resp = await fetch("/api/ocr/images", { headers: { "Authorization": `Bearer ${token}` } });
+                if (!resp.ok) throw new Error(await resp.text());
+                const data = await resp.json();
+                images = data.images;
+                selectedUrls.clear();
+                log(`Loaded ${images.length} images`, 'success');
+                filterImages();
+            } catch (e) { log(`Scan failed: ${e.message}`, 'error'); }
+        }
+
+        function filterImages() {
+            const country = document.getElementById('countryFilter').value;
+            const folder = document.getElementById('folderFilter').value;
+            let filtered = images;
+            if (country !== 'all') filtered = filtered.filter(i => i.country_code === country);
+            const folders = [...new Set(filtered.map(i => i.folder).filter(Boolean))];
+            const folderSelect = document.getElementById('folderFilter');
+            folderSelect.innerHTML = '<option value="all">All Folders</option>';
+            folders.forEach(f => { const opt = document.createElement('option'); opt.value = f; opt.textContent = f; folderSelect.appendChild(opt); });
+            if (folder !== 'all') folderSelect.value = folder;
+            renderGrid();
+        }
+
+        function renderGrid() {
+            const country = document.getElementById('countryFilter').value;
+            const folder = document.getElementById('folderFilter').value;
+            let filtered = images;
+            if (country !== 'all') filtered = filtered.filter(i => i.country_code === country);
+            if (folder !== 'all') filtered = filtered.filter(i => i.folder === folder);
+            const grid = document.getElementById('imageGrid');
+            if (!filtered.length) { grid.innerHTML = '<div style="grid-column:1/-1;">No images</div>'; return; }
+            grid.innerHTML = '';
+            for (const img of filtered) {
+                const isSelected = selectedUrls.has(img.url);
+                const card = document.createElement('div');
+                card.className = `image-card ${isSelected ? 'selected' : ''}`;
+                card.innerHTML = `
+                <div class="image-preview" style="background-image:url('${img.url}')" onclick="toggleSelect('${img.url}')">
+                    <div class="image-select-overlay ${isSelected ? 'checked' : ''}" onclick="event.stopPropagation(); toggleSelect('${img.url}')"></div>
+                </div>
+                <div class="image-info">
+                    <strong>${escapeHtml(img.name)}</strong><br>
+                    <small>${img.country_code}/${img.folder}</small>
+                    ${img.processed ? '<span style="color:#10b981;">✓ Processed</span>' : '<button class="btn btn-primary btn-sm" onclick="analyzeSingle(\'' + img.url + '\')">Process</button>'}
+                </div>
+            `;
+                grid.appendChild(card);
+            }
+            updateUI();
+        }
+
+        function toggleSelect(url) {
+            if (selectedUrls.has(url)) selectedUrls.delete(url);
+            else selectedUrls.add(url);
+            renderGrid();
+        }
+        function selectAll() { images.forEach(i => selectedUrls.add(i.url)); renderGrid(); }
+        function deselectAll() { selectedUrls.clear(); renderGrid(); }
+        function updateUI() {
+            const count = selectedUrls.size;
+            document.getElementById('selectionCounter').innerText = `${count} selected`;
+            document.getElementById('analyzeBtn').disabled = count === 0;
+            document.getElementById('bulkCount').innerText = count;
+            document.getElementById('bulkPanel').classList.toggle('visible', count > 0);
+        }
+
+        async function uploadImages(event) {
+            const files = Array.from(event.target.files);
+            if (!files.length) return;
+            const country = document.getElementById('uploadCountry').value;
+            const category = document.getElementById('uploadCategory').value;
+            const token = await getToken();
+            for (const file of files) {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('country', country);
+                formData.append('category', category);
+                try {
+                    const resp = await fetch("/api/ocr/upload", {
+                        method: "POST",
+                        headers: { "Authorization": `Bearer ${token}` },
+                        body: formData
+                    });
+                    if (!resp.ok) throw new Error(await resp.text());
+                    const data = await resp.json();
+                    log(`Uploaded ${file.name} -> ${data.url}`, 'success');
+                } catch (e) { log(`Upload failed ${file.name}: ${e.message}`, 'error'); }
+            }
+            scanBucket(); // Refresh list
+            event.target.value = '';
+        }
+
+        async function analyzeSelected() {
+            if (selectedUrls.size === 0) return;
+            const urls = Array.from(selectedUrls);
+            const model = document.getElementById('visionModel').value;
+            const prompt = document.getElementById('analysisPrompt').value;
+            const token = await getToken();
+            const progressDiv = document.getElementById('bulkProgress');
+            const resultsDiv = document.getElementById('bulkResults');
+            progressDiv.style.display = 'block';
+            resultsDiv.style.display = 'block';
+            const resultsContainer = document.getElementById('resultsContainer');
+            resultsContainer.innerHTML = '';
+            let done = 0;
+            for (const url of urls) {
+                try {
+                    const resp = await fetch("/api/ocr/analyze-single", {
+                        method: "POST",
+                        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+                        body: JSON.stringify({ image_url: url, model, prompt, save_to_db: true })
+                    });
+                    const data = await resp.json();
+                    resultsContainer.innerHTML += `<div class="result-card"><strong>${escapeHtml(url.split('/').pop())}</strong><pre>${escapeHtml(data.description)}</pre>${data.saved ? '✓ Saved' : ''}</div>`;
+                    log(`Analyzed ${url.split('/').pop()}`, 'success');
+                } catch (e) {
+                    resultsContainer.innerHTML += `<div class="result-card"><strong>${escapeHtml(url.split('/').pop())}</strong> Error: ${e.message}</div>`;
+                    log(`Error on ${url}: ${e.message}`, 'error');
+                }
+                done++;
+                const pct = (done / urls.length) * 100;
+                document.getElementById('progressFill').style.width = `${pct}%`;
+                document.getElementById('progressLabel').innerText = `Processing ${done}/${urls.length}`;
+                document.getElementById('progressPercent').innerText = `${Math.round(pct)}%`;
+            }
+            progressDiv.style.display = 'none';
+            scanBucket(); // refresh processed status
+        }
+
+        async function analyzeSingle(url) {
+            const model = document.getElementById('visionModel').value;
+            const prompt = document.getElementById('analysisPrompt').value;
+            const token = await getToken();
+            try {
+                const resp = await fetch("/api/ocr/analyze-single", {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+                    body: JSON.stringify({ image_url: url, model, prompt, save_to_db: true })
+                });
+                const data = await resp.json();
+                log(`Single image processed: ${data.description.substring(0, 80)}...`, 'success');
+                scanBucket(); // refresh
+            } catch (e) { log(`Process failed: ${e.message}`, 'error'); }
+        }
+
+        function addCustomFolder() {
+            const input = document.getElementById('newFolderInput');
+            const name = input.value.trim().toLowerCase().replace(/\s+/g, '-');
+            if (!name) return;
+            const select = document.getElementById('uploadCategory');
+            if (!Array.from(select.options).some(o => o.value === name)) {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                select.appendChild(opt);
+            }
+            select.value = name;
+            input.value = '';
+        }
+        function escapeHtml(str) { return str.replace(/[&<>]/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]; }); }
+
+        // Check authentication on load
+        window.onload = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) window.location.href = '/';
+            else log("Authenticated", 'success');
+        };
+    </script>
+</body>
+
+</html>

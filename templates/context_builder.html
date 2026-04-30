@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="grid">
+    <div class="sidebar">
+        <h3>Select Agent</h3>
+        <div id="agentsList"></div>
+    </div>
+    <div class="main">
+        <div class="card">
+            <img id="currentImage" class="image-preview" style="max-height: 400px; width: auto;" alt="Image">
+            <div id="imageInfo"></div>
+        </div>
+        <div class="card">
+            <label>Human Context</label>
+            <textarea id="humanContext" rows="4" placeholder="Write local knowledge..."></textarea>
+            <button id="runAgentBtn" class="btn">Run Agent</button>
+            <div id="aiOutput" style="margin-top: 20px; background:#0f172a; padding: 16px; border-radius: 12px;"></div>
+            <div style="margin-top: 16px;">
+                <button id="saveBtn" class="btn btn-secondary">Save & Next</button>
+                <button id="skipBtn" class="btn btn-danger">Skip</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    let currentAgent = null;
+    let currentImageUrl = null;
+    let agentsList = [];
+
+    const supabaseUrl = "{{ supabase_url }}";
+    const supabaseAnon = "{{ supabase_anon_key }}";
+
+    async function fetchAgents() {
+        const token = (await supabaseClient.auth.getSession()).data.session?.access_token;
+        const resp = await fetch('/api/agents', { headers: { 'Authorization': `Bearer ${token}` } });
+        const data = await resp.json();
+        agentsList = data.agents;
+        renderAgents();
+    }
+
+    function renderAgents() {
+        const container = document.getElementById('agentsList');
+        container.innerHTML = agentsList.map(agent => `
+            <div class="agent-card ${currentAgent?.slug === agent.slug ? 'selected' : ''}" data-slug="${agent.slug}">
+                <strong>${agent.display_name}</strong><br>
+                <small>${agent.model_name}</small>
+            </div>
+        `).join('');
+        document.querySelectorAll('.agent-card').forEach(card => {
+            card.addEventListener('click', () => {
+                currentAgent = agentsList.find(a => a.slug === card.dataset.slug);
+                renderAgents();
+            });
+        });
+    }
+
+    async function loadNextImage() {
+        const token = (await supabaseClient.auth.getSession()).data.session?.access_token;
+        const resp = await fetch('/api/image/next', { headers: { 'Authorization': `Bearer ${token}` } });
+        const data = await resp.json();
+        if (data.image) {
+            currentImageUrl = data.image.image_url;
+            document.getElementById('currentImage').src = currentImageUrl;
+            document.getElementById('humanContext').value = '';
+            document.getElementById('aiOutput').innerHTML = '';
+        } else {
+            alert('No more images!');
+        }
+    }
+
+    document.getElementById('runAgentBtn').onclick = async () => {
+        if (!currentAgent) { alert('Select an agent first'); return; }
+        const token = (await supabaseClient.auth.getSession()).data.session?.access_token;
+        const resp = await fetch('/api/run-agent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({
+                image_url: currentImageUrl,
+                agent_slug: currentAgent.slug,
+                human_context: document.getElementById('humanContext').value
+            })
+        });
+        const data = await resp.json();
+        document.getElementById('aiOutput').innerHTML = `<pre>${data.analysis}</pre>`;
+    };
+
+    document.getElementById('saveBtn').onclick = async () => {
+        const token = (await supabaseClient.auth.getSession()).data.session?.access_token;
+        await fetch('/api/save-annotation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({
+                image_url: currentImageUrl,
+                agent_slug: currentAgent?.slug,
+                human_context: document.getElementById('humanContext').value,
+                ai_analysis: document.getElementById('aiOutput').innerText
+            })
+        });
+        loadNextImage();
+    };
+
+    document.getElementById('skipBtn').onclick = () => {
+        loadNextImage();
+    };
+
+    fetchAgents();
+    loadNextImage();
+</script>
+{% endblock %}

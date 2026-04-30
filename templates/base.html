@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Odaflux Portal</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+
+        .navbar {
+            background: #1e293b;
+            padding: 14px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #334155;
+        }
+
+        .navbar a {
+            color: #94a3b8;
+            text-decoration: none;
+            margin-left: 24px;
+            font-weight: 600;
+        }
+
+        .navbar a:hover {
+            color: #38bdf8;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+
+        .card {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #334155;
+        }
+
+        .btn {
+            background: #38bdf8;
+            border: none;
+            color: #0f172a;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-secondary {
+            background: #475569;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+        }
+
+        input,
+        textarea,
+        select {
+            background: #0f172a;
+            border: 1px solid #334155;
+            padding: 8px 12px;
+            border-radius: 8px;
+            color: white;
+            width: 100%;
+        }
+
+        .grid {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .sidebar {
+            width: 280px;
+        }
+
+        .main {
+            flex: 1;
+        }
+
+        .agent-card {
+            background: #0f172a;
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            border: 1px solid #334155;
+        }
+
+        .agent-card.selected {
+            border-color: #38bdf8;
+            background: #1e293b;
+        }
+
+        .image-preview {
+            max-width: 100%;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+
+        textarea {
+            font-family: monospace;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="navbar">
+        <div><strong>🔷 Odaflux Portal</strong></div>
+        <div>
+            <a href="/context-builder">Context Builder</a>
+            <a href="/ocr">OCR</a>
+            <a href="/ugc-analysis">UGC Analysis</a>
+            <a href="/template-factory">Template Factory</a>
+            <a href="/admin/agents">Agents</a>
+            <a href="/admin/users">Users</a>
+            <a href="#" id="logoutBtn">Logout</a>
+        </div>
+    </div>
+    <div class="container" id="app">
+        {% block content %}{% endblock %}
+    </div>
+    <script>
+        const SUPABASE_URL = "{{ supabase_url or '' }}";
+        const SUPABASE_ANON_KEY = "{{ supabase_anon_key or '' }}";
+        // You'll pass these from the backend or use environment; for now we'll set from window.
+        window.supabaseClient = null;
+        async function initSupabase() {
+            if (typeof supabase === 'undefined') return;
+            // You can read from env or hardcode – we'll fetch from meta or from backend injected.
+            const url = "{{ request.url_for('home') }}".replace(/\/$/, '');
+            // Actually we need to get from backend config. Simpler: set in script from backend variable.
+        }
+        document.getElementById('logoutBtn')?.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const { error } = await window.supabaseClient?.auth.signOut();
+            window.location.href = '/';
+        });
+    </script>
+</body>
+
+</html>
