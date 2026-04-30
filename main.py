@@ -69,7 +69,7 @@ async def call_llm(model_name: str, system_prompt: str, user_prompt: str, image_
     if model_name.startswith("gemini-"):
         if not GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY missing")
-        client = genai.Client(api_key=GEMINI_API_KEY)
+        client = genai.Client(api_key=GEMINI_API_KEY, http_options={"api_version": "v1"})
         parts = [system_prompt + "\n\n" + user_prompt]
         if image_url:
             # download image
@@ -552,7 +552,7 @@ async def analyze_images(request: Request, user=Depends(get_current_user)):
             # Call Gemini vision
             from google import genai
             from google.genai import types
-            client = genai.Client(api_key=GEMINI_API_KEY)
+            client = genai.Client(api_key=GEMINI_API_KEY, http_options={"api_version": "v1"})
             # Download image
             async with httpx.AsyncClient() as http:
                 resp = await http.get(url, timeout=30)
@@ -641,7 +641,7 @@ async def analyze_single_image(request: Request, user=Depends(get_current_user))
     try:
         from google import genai
         from google.genai import types
-        client = genai.Client(api_key=GEMINI_API_KEY)
+        client = genai.Client(api_key=GEMINI_API_KEY, http_options={"api_version": "v1"})
         async with httpx.AsyncClient() as http:
             resp = await http.get(image_url, timeout=30)
             resp.raise_for_status()
