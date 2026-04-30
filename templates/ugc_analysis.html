@@ -51,6 +51,17 @@
         .ri-meta { font-size: 11px; color: #64748b; margin-bottom: 4px; }
         .ri-desc { font-size: 12px; color: #94a3b8; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
         .log-box { background: #0a0f1e; color: #67e8f9; font-family: monospace; padding: 12px; border-radius: 10px; height: 140px; overflow-y: auto; font-size: 12px; }
+        /* Bucket browser */
+        .bucket-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+        .bucket-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; max-height: 260px; overflow-y: auto; background: #0f172a; border-radius: 10px; padding: 10px; border: 1px solid #334155; }
+        .bucket-thumb { border: 2px solid transparent; border-radius: 8px; overflow: hidden; cursor: pointer; transition: border-color 0.15s; position: relative; aspect-ratio: 1; background: #1e293b; }
+        .bucket-thumb:hover { border-color: #475569; }
+        .bucket-thumb.selected { border-color: #38bdf8; }
+        .bucket-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .bucket-thumb .processed-dot { position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; border-radius: 50%; background: #10b981; }
+        .bucket-selected-preview { background: #0f172a; border: 1px solid #38bdf8; border-radius: 10px; padding: 8px; margin-top: 8px; display: none; align-items: center; gap: 10px; }
+        .bucket-selected-preview img { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+        .bucket-selected-preview .bsp-info { font-size: 12px; color: #94a3b8; line-height: 1.5; }
         @media (max-width: 860px) { .container { grid-template-columns: 1fr; } .full { grid-column: 1; } }
     </style>
 </head>
@@ -75,6 +86,7 @@
         <div class="source-tabs">
             <button class="source-tab active" id="tabUpload" onclick="switchSource('upload')"><i class="fas fa-upload"></i> Upload File</button>
             <button class="source-tab" id="tabUrl" onclick="switchSource('url')"><i class="fas fa-link"></i> Paste URL</button>
+            <button class="source-tab" id="tabBucket" onclick="switchSource('bucket')"><i class="fas fa-database"></i> From Bucket</button>
         </div>
 
         <!-- Upload panel -->
@@ -93,6 +105,35 @@
             <div id="uploadStatus" style="display:none;margin-top:8px;">
                 <span style="font-size:11px;color:#64748b;" id="uploadLabel">Uploading…</span>
                 <div class="prog-wrap"><div class="prog-fill" id="uploadFill" style="width:0%"></div></div>
+            </div>
+        </div>
+
+        <!-- Bucket panel -->
+        <div id="panelBucket" style="display:none;">
+            <div class="bucket-toolbar">
+                <select id="bucketCountryFilter" onchange="applyBucketFilter()" style="width:auto;">
+                    <option value="all">🌍 All Countries</option>
+                    <option value="ET">🇪🇹 ET</option>
+                    <option value="EG">🇪🇬 EG</option>
+                    <option value="KE">🇰🇪 KE</option>
+                    <option value="NG">🇳🇬 NG</option>
+                    <option value="VN">🇻🇳 VN</option>
+                </select>
+                <select id="bucketFolderFilter" onchange="applyBucketFilter()" style="width:auto;">
+                    <option value="all">📂 All Folders</option>
+                </select>
+                <button class="btn btn-outline btn-sm" onclick="loadBucketImages()"><i class="fas fa-sync"></i> Load</button>
+                <span id="bucketCount" style="font-size:12px;color:#64748b;"></span>
+            </div>
+            <div class="bucket-grid" id="bucketGrid">
+                <div style="grid-column:1/-1;color:#64748b;font-size:13px;text-align:center;padding:20px;">Click Load to browse bucket images</div>
+            </div>
+            <div class="bucket-selected-preview" id="bucketSelectedPreview">
+                <img id="bucketSelectedImg" alt="">
+                <div class="bsp-info">
+                    <strong id="bucketSelectedName" style="color:#e2e8f0;"></strong><br>
+                    <span id="bucketSelectedMeta"></span>
+                </div>
             </div>
         </div>
 
@@ -234,9 +275,82 @@
         currentSource = src;
         document.getElementById('panelUpload').style.display = src === 'upload' ? 'block' : 'none';
         document.getElementById('panelUrl').style.display    = src === 'url'    ? 'block' : 'none';
+        document.getElementById('panelBucket').style.display = src === 'bucket' ? 'block' : 'none';
         document.getElementById('tabUpload').classList.toggle('active', src === 'upload');
         document.getElementById('tabUrl').classList.toggle('active', src === 'url');
-        if (src === 'upload') currentImageUrl = null;
+        document.getElementById('tabBucket').classList.toggle('active', src === 'bucket');
+        if (src !== 'bucket') { currentImageUrl = null; }
+        if (src === 'bucket' && allBucketImages.length === 0) loadBucketImages();
+    }
+
+    // ── Bucket Browser ────────────────────────────────────
+    let allBucketImages = [];
+    let selectedBucketUrl = null;
+
+    async function loadBucketImages() {
+        const grid = document.getElementById('bucketGrid');
+        grid.innerHTML = '<div style="grid-column:1/-1;color:#94a3b8;font-size:12px;text-align:center;padding:20px;"><i class="fas fa-spinner fa-spin"></i> Scanning bucket…</div>';
+        document.getElementById('bucketCount').textContent = '';
+        log('Scanning oda-brain bucket…');
+        try {
+            const data = await api('GET', '/api/ocr/images');
+            allBucketImages = data.images || [];
+            // Populate folder filter
+            const folders = [...new Set(allBucketImages.map(i => i.folder).filter(Boolean))].sort();
+            const fSelect = document.getElementById('bucketFolderFilter');
+            fSelect.innerHTML = '<option value="all">📂 All Folders</option>';
+            folders.forEach(f => { const o = document.createElement('option'); o.value = f; o.textContent = `📁 ${f}`; fSelect.appendChild(o); });
+            log(`Loaded ${allBucketImages.length} bucket images`, 'success');
+            applyBucketFilter();
+        } catch (e) { log(`Bucket load failed: ${e.message}`, 'error'); grid.innerHTML = '<div style="grid-column:1/-1;color:#f87171;padding:20px;text-align:center;">Failed to load images</div>'; }
+    }
+
+    function applyBucketFilter() {
+        const country = document.getElementById('bucketCountryFilter').value;
+        const folder  = document.getElementById('bucketFolderFilter').value;
+        let filtered = allBucketImages;
+        if (country !== 'all') filtered = filtered.filter(i => i.country_code === country);
+        if (folder  !== 'all') filtered = filtered.filter(i => i.folder === folder);
+        document.getElementById('bucketCount').textContent = `${filtered.length} images`;
+        renderBucketGrid(filtered);
+    }
+
+    function renderBucketGrid(images) {
+        const grid = document.getElementById('bucketGrid');
+        if (!images.length) { grid.innerHTML = '<div style="grid-column:1/-1;color:#64748b;font-size:12px;text-align:center;padding:20px;">No images match filters</div>'; return; }
+        grid.innerHTML = '';
+        images.forEach(img => {
+            const div = document.createElement('div');
+            div.className = 'bucket-thumb' + (img.url === selectedBucketUrl ? ' selected' : '');
+            div.title = `${img.country_code}/${img.folder}/${img.name}`;
+            div.onclick = () => selectBucketImage(img);
+            div.innerHTML = `<img src="${esc(img.url)}" loading="lazy" onerror="this.parentElement.style.background='#334155'">
+                ${img.processed ? '<div class="processed-dot" title="Already in context_images"></div>' : ''}`;
+            grid.appendChild(div);
+        });
+    }
+
+    function selectBucketImage(img) {
+        selectedBucketUrl = img.url;
+        currentImageUrl = img.url;
+        // Auto-fill country + folder dropdowns
+        const cSelect = document.getElementById('country');
+        const fSelect = document.getElementById('folder');
+        if (img.country_code) cSelect.value = img.country_code;
+        if (img.folder) {
+            const exists = Array.from(fSelect.options).some(o => o.value === img.folder);
+            if (!exists) { const o = document.createElement('option'); o.value = img.folder; o.textContent = img.folder; fSelect.appendChild(o); }
+            fSelect.value = img.folder;
+        }
+        // Show selected preview strip
+        const preview = document.getElementById('bucketSelectedPreview');
+        preview.style.display = 'flex';
+        document.getElementById('bucketSelectedImg').src = img.url;
+        document.getElementById('bucketSelectedName').textContent = img.name;
+        document.getElementById('bucketSelectedMeta').textContent = `${img.country_code} / ${img.folder}${img.processed ? ' · ✓ already annotated' : ' · not yet annotated'}`;
+        // Re-render grid to highlight selection
+        applyBucketFilter();
+        log(`Selected: ${img.country_code}/${img.folder}/${img.name}`, 'success');
     }
 
     function handleDrop(e) { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) processFile(f); }
