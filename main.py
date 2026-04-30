@@ -596,22 +596,35 @@ async def analyze_images(request: Request, user=Depends(get_current_user)):
 
 @app.post("/api/ocr/analyze-single")
 async def analyze_single_image(request: Request, user=Depends(get_current_user)):
-    """Analyze a single image (same as above but with URL only)."""
+    """Analyze a single image with optional human annotation context."""
     body = await request.json()
     image_url = body.get("image_url")
     model = body.get("model", "gemini-3.1-flash-preview")
-    prompt = body.get("prompt", "Describe this image in detail for cultural context.")
+    base_prompt = body.get("prompt", "Describe this image in detail for cultural context.")
+    human_context = body.get("human_context", "").strip()
     save_to_db = body.get("save_to_db", True)
-    
+
+    if not image_url:
+        raise HTTPException(400, "image_url required")
     if not supabase or not GEMINI_API_KEY:
         raise HTTPException(500, "Missing configuration")
-    
-    # Extract country and folder from URL
-    import re
-    match = re.search(r'/oda-brain/([^/]+)/([^/]+)/', image_url)
-    country = match.group(1) if match else "unknown"
-    folder = match.group(2) if match else "unknown"
-    
+
+    # Country/folder: use explicit body values first, fall back to URL extraction
+    url_match = re.search(r'/oda-brain/([^/]+)/([^/]+)/', image_url)
+    country = body.get("country_code") or (url_match.group(1) if url_match else "unknown")
+    folder  = body.get("folder")       or (url_match.group(2) if url_match else "general")
+
+    # Build final prompt — append human annotation when provided
+    if human_context:
+        prompt = (
+            f"{base_prompt}\n\n"
+            f"The annotator has provided this additional context about the image:\n"
+            f"\"{human_context}\"\n\n"
+            f"Use this human knowledge to enrich your description."
+        )
+    else:
+        prompt = base_prompt
+
     try:
         from google import genai
         from google.genai import types
@@ -628,6 +641,7 @@ async def analyze_single_image(request: Request, user=Depends(get_current_user))
             config={"temperature": 0.4}
         )
         description = response.text.strip()
+
         # Generate embedding
         embed_response = await client.models.embed_content(
             model="models/gemini-embedding-2",
@@ -635,6 +649,7 @@ async def analyze_single_image(request: Request, user=Depends(get_current_user))
             config=types.EmbedContentConfig(output_dimensionality=3072)
         )
         embedding = embed_response.embeddings[0].values
+
         saved = False
         if save_to_db:
             existing = supabase.table("context_images").select("id").eq("image_url", image_url).execute()
@@ -649,12 +664,32 @@ async def analyze_single_image(request: Request, user=Depends(get_current_user))
             else:
                 supabase.table("context_images").update({
                     "description": description,
-                    "embedding": embedding
+                    "embedding": embedding,
+                    "country_code": country,
+                    "folder": folder
                 }).eq("image_url", image_url).execute()
             saved = True
-        return {"description": description, "saved": saved}
+
+        return {
+            "description": description,
+            "saved": saved,
+            "country_code": country,
+            "folder": folder,
+            "image_url": image_url
+        }
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+@app.get("/api/annotation/recent")
+async def recent_annotations(limit: int = 10, user=Depends(get_current_user)):
+    """Return the most recently saved context_images rows."""
+    res = supabase.table("context_images") \
+        .select("id, image_url, country_code, folder, description, created_at") \
+        .order("created_at", desc=True) \
+        .limit(limit) \
+        .execute()
+    return {"items": res.data}
 
 # ==================== Gallery Endpoint ====================
 @app.get("/api/gallery/images")

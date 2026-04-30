@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Annotation – Odaflux</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+        .navbar { background: #1e293b; padding: 14px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; }
+        .navbar strong { color: #38bdf8; font-size: 16px; }
+        .navbar a { color: #94a3b8; text-decoration: none; margin-left: 20px; font-size: 13px; font-weight: 600; }
+        .navbar a:hover { color: #38bdf8; }
+        .container { max-width: 1200px; margin: 24px auto; padding: 0 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .full { grid-column: 1 / -1; }
+        .card { background: #1e293b; border-radius: 16px; padding: 24px; border: 1px solid #334155; }
+        .card h2 { font-size: 15px; font-weight: 700; color: #e2e8f0; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .card h2 i { color: #38bdf8; }
+        label { font-size: 12px; color: #94a3b8; font-weight: 600; display: block; margin-bottom: 5px; }
+        .form-row { margin-bottom: 14px; }
+        input[type=text], input[type=url], select, textarea { background: #0f172a; border: 1px solid #334155; padding: 9px 12px; border-radius: 8px; color: #e2e8f0; font-size: 13px; width: 100%; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #38bdf8; }
+        textarea { resize: vertical; font-family: inherit; line-height: 1.5; }
+        .btn { padding: 9px 18px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 7px; transition: opacity 0.15s; }
+        .btn:hover { opacity: 0.85; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-outline { background: transparent; border: 1px solid #475569; color: #94a3b8; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; }
+        .btn-full { width: 100%; justify-content: center; }
+        .source-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+        .source-tab { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer; border: 1px solid #334155; background: transparent; color: #64748b; transition: all 0.15s; }
+        .source-tab.active { background: #38bdf8; color: #0f172a; border-color: #38bdf8; }
+        .img-preview-wrap { background: #0f172a; border: 2px dashed #334155; border-radius: 12px; min-height: 200px; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; transition: border-color 0.2s; }
+        .img-preview-wrap:hover { border-color: #475569; }
+        .img-preview-wrap img { width: 100%; max-height: 280px; object-fit: contain; display: none; }
+        .img-placeholder { text-align: center; color: #475569; font-size: 13px; padding: 24px; }
+        .img-placeholder i { font-size: 2.4em; display: block; margin-bottom: 10px; color: #334155; }
+        .prog-wrap { background: #334155; border-radius: 999px; height: 5px; overflow: hidden; margin-top: 6px; }
+        .prog-fill { background: #38bdf8; height: 100%; transition: width 0.3s; }
+        .result-box { background: #0f172a; border: 1px solid #10b981; border-radius: 10px; padding: 16px; font-size: 13px; line-height: 1.7; color: #e2e8f0; white-space: pre-wrap; display: none; }
+        .result-box.visible { display: block; }
+        .success-banner { background: #064e3b; border: 1px solid #10b981; border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #34d399; display: none; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .success-banner.visible { display: flex; }
+        .recent-list { display: flex; flex-direction: column; gap: 10px; max-height: 460px; overflow-y: auto; }
+        .recent-item { background: #0f172a; border: 1px solid #334155; border-radius: 10px; display: flex; gap: 12px; overflow: hidden; }
+        .recent-item img { width: 80px; height: 80px; object-fit: cover; flex-shrink: 0; }
+        .ri-body { padding: 10px; flex: 1; min-width: 0; }
+        .ri-meta { font-size: 11px; color: #64748b; margin-bottom: 4px; }
+        .ri-desc { font-size: 12px; color: #94a3b8; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        .log-box { background: #0a0f1e; color: #67e8f9; font-family: monospace; padding: 12px; border-radius: 10px; height: 140px; overflow-y: auto; font-size: 12px; }
+        @media (max-width: 860px) { .container { grid-template-columns: 1fr; } .full { grid-column: 1; } }
+    </style>
+</head>
+<body>
+
+<div class="navbar">
+    <strong>✍️ Image Annotation</strong>
+    <div>
+        <a href="/ocr">OCR Builder</a>
+        <a href="/template-factory">Templates</a>
+        <a href="/gallery">Gallery</a>
+        <a href="/" id="logoutBtn">Logout</a>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- ===== LEFT: FORM ===== -->
+    <div class="card">
+        <h2><i class="fas fa-pen-nib"></i> Annotate Image</h2>
+
+        <div class="source-tabs">
+            <button class="source-tab active" id="tabUpload" onclick="switchSource('upload')"><i class="fas fa-upload"></i> Upload File</button>
+            <button class="source-tab" id="tabUrl" onclick="switchSource('url')"><i class="fas fa-link"></i> Paste URL</button>
+        </div>
+
+        <!-- Upload panel -->
+        <div id="panelUpload">
+            <div class="img-preview-wrap" id="dropZone"
+                 onclick="document.getElementById('fileInput').click()"
+                 ondragover="event.preventDefault()"
+                 ondrop="handleDrop(event)">
+                <img id="previewImg" alt="preview">
+                <div class="img-placeholder" id="previewPlaceholder">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    Click to select or drag &amp; drop an image
+                </div>
+            </div>
+            <input type="file" id="fileInput" accept="image/*" style="display:none;" onchange="handleFileSelect(event)">
+            <div id="uploadStatus" style="display:none;margin-top:8px;">
+                <span style="font-size:11px;color:#64748b;" id="uploadLabel">Uploading…</span>
+                <div class="prog-wrap"><div class="prog-fill" id="uploadFill" style="width:0%"></div></div>
+            </div>
+        </div>
+
+        <!-- URL panel -->
+        <div id="panelUrl" style="display:none;">
+            <div class="form-row" style="margin-bottom:8px;">
+                <label>Image URL</label>
+                <input type="url" id="imageUrlInput" placeholder="https://..." oninput="previewFromUrl()">
+            </div>
+            <div class="img-preview-wrap" style="cursor:default;min-height:140px;">
+                <img id="urlPreviewImg" alt="url preview" style="display:none;">
+                <div class="img-placeholder" id="urlPlaceholder"><i class="fas fa-image"></i>Enter URL above to preview</div>
+            </div>
+        </div>
+
+        <div style="margin-top:16px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;" class="form-row">
+                <div>
+                    <label>Country</label>
+                    <select id="country">
+                        <option value="ET" selected>🇪🇹 Ethiopia</option>
+                        <option value="EG">🇪🇬 Egypt</option>
+                        <option value="KE">🇰🇪 Kenya</option>
+                        <option value="NG">🇳🇬 Nigeria</option>
+                        <option value="VN">🇻🇳 Vietnam</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Category / Folder</label>
+                    <select id="folder">
+                        <option value="architecture">Architecture</option>
+                        <option value="street-scenes">Street Scenes</option>
+                        <option value="fashion">Fashion</option>
+                        <option value="landscapes">Landscapes</option>
+                        <option value="lifestyle">Lifestyle</option>
+                        <option value="food">Food</option>
+                        <option value="markets">Markets</option>
+                        <option value="general">General</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <label>Your Annotation <span style="color:#475569;font-weight:400;">(cultural knowledge, landmark name, context…)</span></label>
+                <textarea id="humanAnnotation" rows="5"
+                    placeholder="e.g. This is Medhane Alem Cathedral in Bole, Addis Ababa — Neo-Byzantine architecture with three mint-green domes. The surrounding area is a dense commercial hub near Bole Road..."></textarea>
+            </div>
+
+            <div class="form-row">
+                <label>Vision Model</label>
+                <select id="visionModel">
+                    <option value="gemini-3.1-flash-preview">Gemini 3.1 Flash (fast)</option>
+                    <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (detailed)</option>
+                    <option value="gemini-2.5-flash-preview-04-17">Gemini 2.5 Flash</option>
+                </select>
+            </div>
+
+            <button class="btn btn-success btn-full" id="generateBtn" onclick="generateAndSave()">
+                <i class="fas fa-magic"></i> Generate &amp; Save
+            </button>
+        </div>
+    </div>
+
+    <!-- ===== RIGHT: RESULT + RECENT ===== -->
+    <div style="display:flex;flex-direction:column;gap:20px;">
+
+        <div class="card">
+            <h2><i class="fas fa-comment-dots"></i> AI-Generated Description</h2>
+            <div class="success-banner" id="successBanner">
+                <i class="fas fa-check-circle" style="font-size:18px;flex-shrink:0;"></i>
+                <div>
+                    <strong>Saved to context_images</strong>
+                    <div id="savedMeta" style="font-size:11px;opacity:0.8;margin-top:2px;"></div>
+                </div>
+            </div>
+            <div class="result-box" id="resultBox"></div>
+            <div id="actionBtns" style="display:none;margin-top:10px;display:none;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-outline btn-sm" onclick="copyResult()"><i class="fas fa-copy"></i> Copy</button>
+                <button class="btn btn-outline btn-sm" onclick="resetForm()"><i class="fas fa-redo"></i> Annotate Another</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>
+                <i class="fas fa-history"></i> Recent Saves
+                <button class="btn btn-outline btn-sm" onclick="loadRecent()" style="margin-left:auto;padding:4px 8px;">
+                    <i class="fas fa-sync" style="font-size:11px;"></i>
+                </button>
+            </h2>
+            <div class="recent-list" id="recentList">
+                <div style="color:#64748b;font-size:13px;text-align:center;padding:20px;">Loading…</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ===== LOG ===== -->
+    <div class="card full">
+        <h2><i class="fas fa-terminal"></i> Activity Log</h2>
+        <div class="log-box" id="logBox"></div>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('logBox').innerHTML=''" style="margin-top:8px;">Clear</button>
+    </div>
+
+</div>
+
+<script>
+    const SB_URL = "https://vjcumvumnnvgncnbbtzk.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqY3VtdnVtbm52Z25jbmJidHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5MjQwOTMsImV4cCI6MjA4MzUwMDA5M30.6YtPHl9EXnRNDtdUIMkNbLLyUvuk9hG3k1gHjn14qd4";
+    const sb = window.supabase.createClient(SB_URL, SB_KEY);
+
+    let currentImageUrl = null;
+    let currentSource = 'upload';
+
+    async function getToken() {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) { window.location.href = '/'; throw new Error('Not authenticated'); }
+        return session.access_token;
+    }
+
+    async function api(method, path, body) {
+        const token = await getToken();
+        const opts = { method, headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } };
+        if (body) opts.body = JSON.stringify(body);
+        const res = await fetch(path, opts);
+        if (!res.ok) { const t = await res.text(); throw new Error(t); }
+        return res.json();
+    }
+
+    function log(msg, type = 'info') {
+        const box = document.getElementById('logBox');
+        const colors = { info: '#67e8f9', success: '#4ade80', error: '#f87171', warn: '#fbbf24' };
+        box.innerHTML += `<div><span style="color:#475569">[${new Date().toLocaleTimeString()}]</span> <span style="color:${colors[type]||colors.info}">${esc(msg)}</span></div>`;
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+    function switchSource(src) {
+        currentSource = src;
+        document.getElementById('panelUpload').style.display = src === 'upload' ? 'block' : 'none';
+        document.getElementById('panelUrl').style.display    = src === 'url'    ? 'block' : 'none';
+        document.getElementById('tabUpload').classList.toggle('active', src === 'upload');
+        document.getElementById('tabUrl').classList.toggle('active', src === 'url');
+        if (src === 'upload') currentImageUrl = null;
+    }
+
+    function handleDrop(e) { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) processFile(f); }
+    function handleFileSelect(e) { const f = e.target.files[0]; if (f) processFile(f); }
+
+    async function processFile(file) {
+        if (!file.type.startsWith('image/')) { log('Not an image file', 'error'); return; }
+
+        // Instant local preview
+        const reader = new FileReader();
+        reader.onload = ev => {
+            const img = document.getElementById('previewImg');
+            img.src = ev.target.result; img.style.display = 'block';
+            document.getElementById('previewPlaceholder').style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+
+        const country = document.getElementById('country').value;
+        const folder  = document.getElementById('folder').value;
+        log(`Uploading ${file.name} → oda-brain/${country}/${folder}`);
+
+        const status = document.getElementById('uploadStatus');
+        const fill   = document.getElementById('uploadFill');
+        const label  = document.getElementById('uploadLabel');
+        status.style.display = 'block';
+        fill.style.width = '20%';
+        label.textContent = 'Uploading…';
+
+        try {
+            const token = await getToken();
+            const form = new FormData();
+            form.append('file', file);
+            form.append('country', country);
+            form.append('folder', folder);
+            fill.style.width = '60%';
+            const res = await fetch('/api/ocr/upload', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: form });
+            if (!res.ok) throw new Error(await res.text());
+            const data = await res.json();
+            currentImageUrl = data.url;
+            fill.style.width = '100%';
+            label.textContent = `✓ ${data.path}`;
+            log(`Uploaded: ${data.url}`, 'success');
+        } catch (e) {
+            label.textContent = 'Upload failed';
+            log(`Upload failed: ${e.message}`, 'error');
+        }
+    }
+
+    function previewFromUrl() {
+        const url = document.getElementById('imageUrlInput').value.trim();
+        const img = document.getElementById('urlPreviewImg');
+        const ph  = document.getElementById('urlPlaceholder');
+        if (url) {
+            img.src = url; img.style.display = 'block';
+            img.onerror = () => { img.style.display = 'none'; ph.style.display = 'flex'; };
+            ph.style.display = 'none';
+            currentImageUrl = url;
+        } else {
+            img.style.display = 'none'; ph.style.display = 'flex';
+            currentImageUrl = null;
+        }
+    }
+
+    async function generateAndSave() {
+        if (currentSource === 'url') currentImageUrl = document.getElementById('imageUrlInput').value.trim();
+        if (!currentImageUrl) { log('Upload an image or enter a URL first', 'warn'); return; }
+
+        const btn = document.getElementById('generateBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing…';
+
+        const payload = {
+            image_url:    currentImageUrl,
+            human_context: document.getElementById('humanAnnotation').value.trim(),
+            model:        document.getElementById('visionModel').value,
+            country_code: document.getElementById('country').value,
+            folder:       document.getElementById('folder').value,
+            save_to_db:   true
+        };
+
+        log(`Sending to ${payload.model}${payload.human_context ? ' + human context' : ''}…`);
+
+        try {
+            const data = await api('POST', '/api/ocr/analyze-single', payload);
+
+            const box = document.getElementById('resultBox');
+            box.textContent = data.description;
+            box.classList.add('visible');
+
+            const actions = document.getElementById('actionBtns');
+            actions.style.display = 'flex';
+
+            if (data.saved) {
+                const banner = document.getElementById('successBanner');
+                banner.classList.add('visible');
+                document.getElementById('savedMeta').textContent =
+                    `${data.country_code} / ${data.folder}  ·  ${new Date().toLocaleTimeString()}`;
+            }
+
+            log('Saved to context_images ✓', 'success');
+            await loadRecent();
+        } catch (e) {
+            log(`Error: ${e.message}`, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-magic"></i> Generate &amp; Save';
+        }
+    }
+
+    function copyResult() {
+        navigator.clipboard.writeText(document.getElementById('resultBox').textContent)
+            .then(() => log('Copied to clipboard', 'success'));
+    }
+
+    function resetForm() {
+        currentImageUrl = null;
+        ['humanAnnotation'].forEach(id => document.getElementById(id).value = '');
+        const box = document.getElementById('resultBox');
+        box.textContent = ''; box.classList.remove('visible');
+        document.getElementById('successBanner').classList.remove('visible');
+        document.getElementById('actionBtns').style.display = 'none';
+        document.getElementById('previewImg').style.display = 'none';
+        document.getElementById('previewImg').src = '';
+        document.getElementById('previewPlaceholder').style.display = 'flex';
+        document.getElementById('uploadStatus').style.display = 'none';
+        document.getElementById('uploadFill').style.width = '0%';
+        document.getElementById('imageUrlInput').value = '';
+        document.getElementById('urlPreviewImg').style.display = 'none';
+        document.getElementById('urlPlaceholder').style.display = 'flex';
+        document.getElementById('fileInput').value = '';
+        log('Ready for next annotation');
+    }
+
+    async function loadRecent() {
+        try {
+            const data = await api('GET', '/api/annotation/recent?limit=8');
+            const list = document.getElementById('recentList');
+            const items = data.items || [];
+            if (!items.length) {
+                list.innerHTML = '<div style="color:#64748b;font-size:13px;text-align:center;padding:20px;">No saves yet</div>';
+                return;
+            }
+            list.innerHTML = '';
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'recent-item';
+                const ts = item.created_at ? new Date(item.created_at).toLocaleDateString() : '';
+                div.innerHTML = `
+                    <img src="${esc(item.image_url)}" loading="lazy" onerror="this.style.display='none'">
+                    <div class="ri-body">
+                        <div class="ri-meta">${esc(item.country_code||'?')} / ${esc(item.folder||'?')} · ${ts}</div>
+                        <div class="ri-desc">${esc(item.description||'No description')}</div>
+                    </div>`;
+                list.appendChild(div);
+            });
+        } catch (e) { log(`Load recent failed: ${e.message}`, 'error'); }
+    }
+
+    window.onload = async () => {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) { window.location.href = '/'; return; }
+        log('Ready to annotate', 'success');
+        document.getElementById('logoutBtn').addEventListener('click', async e => {
+            e.preventDefault(); await sb.auth.signOut(); window.location.href = '/';
+        });
+        await loadRecent();
+    };
+</script>
+</body>
+</html>
