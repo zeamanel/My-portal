@@ -273,7 +273,7 @@ async def stage2_convert_ideas(request: Request, user=Depends(get_current_user))
                 "creator_id": "cf47617f-a205-46ab-9268-d8b816a54758",
                 "base_price_tokens": 10
             }
-            tpl_res = supabase.table("creator_templates").insert(tpl_data).select("id").execute()
+            tpl_res = supabase.table("creator_templates").insert(tpl_data).execute()
             if tpl_res.data:
                 template_id = tpl_res.data[0]["id"]
                 for idx, field in enumerate(enriched.get("fields", [])):
