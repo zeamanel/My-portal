@@ -261,7 +261,9 @@ async def stage2_convert_ideas(request: Request, user=Depends(get_current_user))
             sys2 = (
                 "You are an AI prompt engineer. Return ONLY a valid JSON object (no markdown, no explanation) with these keys: "
                 "title (string), description (string), prompt_template (string with {{placeholders}}), "
-                "fields (array of objects with: field_name, field_label, field_type, placeholder, is_required)."
+                "fields (array of objects with: field_name, field_label, field_type, placeholder, is_required, options). "
+                "For fields with field_type 'select', include an 'options' array (list of strings) with 4-6 plausible choices. "
+                "For all other field types, set options to an empty array []."
             )
             usr2 = f"Brief:\n{brief}\nMedia type: {idea['media_type']}"
             raw_json = await call_llm(stage2_model, sys2, usr2, temperature=0.5)
@@ -288,6 +290,7 @@ async def stage2_convert_ideas(request: Request, user=Depends(get_current_user))
                         "field_type": field.get("field_type", "text"),
                         "placeholder": field.get("placeholder", ""),
                         "is_required": bool(field.get("is_required", True)),
+                        "options": field.get("options", []),
                         "display_order": idx
                     }).execute()
                 supabase.table("template_idea").update({"stage": "processed"}).eq("id", idea["id"]).execute()
