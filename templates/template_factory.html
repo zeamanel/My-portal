@@ -182,7 +182,7 @@
                     <div class="fields-form" id="dynamicFields"></div>
 
                     <button class="btn btn-success" onclick="runTest()" id="testBtn" style="margin-top:14px;width:100%;">
-                        <i class="fas fa-play"></i> Test Generate
+                        <i class="fas fa-play"></i> Generate Asset
                     </button>
                 </div>
             </div>
@@ -523,34 +523,42 @@
         } catch (e) { log(`Toggle publish failed: ${e.message}`, 'error'); }
     }
 
-    // ── Test Generate ─────────────────────────────────────
+    // ── Generate Asset ─────────────────────────────────────
     async function runTest() {
         if (!selectedTemplateId) { log('No template selected', 'warn'); return; }
         const btn = document.getElementById('testBtn');
         btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating…';
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating asset…';
 
-        // Collect field values
         const field_values = {};
         document.querySelectorAll('#dynamicFields input, #dynamicFields select, #dynamicFields textarea').forEach(el => {
             const name = el.id.replace('field_', '');
             field_values[name] = el.value;
         });
 
-        const model = document.getElementById('testModel').value;
-        log(`Testing template with model ${model}…`);
+        log(`Generating asset from template ${selectedTemplateId}…`);
         try {
-            const data = await api('POST', '/api/template/test', { template_id: selectedTemplateId, field_values, model });
-            lastRefinedPrompt = data.refined_prompt;
-            document.getElementById('finalPromptBox').textContent = data.final_prompt || '(empty)';
-            document.getElementById('refinedPromptBox').textContent = data.refined_prompt || '(empty)';
+            const data = await api('POST', '/api/template/generate', {
+                template_id: selectedTemplateId,
+                field_values
+            });
+            const outputUrl = data.output_url;
+
+            document.getElementById('afterUrl').value = outputUrl;
+            updateThumb('after');
+
+            document.getElementById('finalPromptBox').textContent = 'Generation completed. Preview updated.';
+            document.getElementById('refinedPromptBox').textContent = '';
             document.getElementById('resultSection').style.display = 'block';
-            document.getElementById('replaceBar').classList.add('visible');
-            log('Test complete', 'success');
-        } catch (e) { log(`Test failed: ${e.message}`, 'error'); }
-        finally {
+            document.getElementById('replaceBar').classList.remove('visible');
+            log(`Asset generated: ${outputUrl}`, 'success');
+        } catch (e) {
+            log(`Generation failed: ${e.message}`, 'error');
+            document.getElementById('finalPromptBox').textContent = `Error: ${e.message}`;
+            document.getElementById('resultSection').style.display = 'block';
+        } finally {
             btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-play"></i> Test Generate';
+            btn.innerHTML = '<i class="fas fa-play"></i> Generate Asset';
         }
     }
 

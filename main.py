@@ -16,6 +16,10 @@ load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
+# ==================== Generation Backend ====================
+ADMIN_USER_ID = os.getenv("ADMIN_USER_ID", "fc6f2b43-739c-4e8e-9e67-bd2389288922")
+MAIN_BACKEND_URL = os.getenv("MAIN_BACKEND_URL", "https://musa-ai-backend-760742977917.us-central1.run.app")
+
 if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
     print("WARNING: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set. The app may not function correctly.")
     # Do NOT raise – let the app start anyway so we can debug.
@@ -345,6 +349,72 @@ async def test_template_generation(request: Request, user=Depends(get_current_us
     except Exception as e:
         refined = prompt  # fallback: return raw prompt
     return {"final_prompt": prompt, "refined_prompt": refined}
+
+@app.post("/api/template/generate")
+async def generate_template_asset(request: Request, user=Depends(get_current_user)):
+    """Generate an actual asset from a template using the main AI generation API."""
+    body = await request.json()
+    template_id = body.get("template_id")
+    field_values = body.get("field_values", {})
+    if not template_id:
+        raise HTTPException(400, "Missing template_id")
+
+    tpl_res = supabase.table("creator_templates").select("*").eq("id", template_id).execute()
+    if not tpl_res.data:
+        raise HTTPException(404, "Template not found")
+    template = tpl_res.data[0]
+
+    prompt_template = template.get("prompt_template", "")
+    final_prompt = prompt_template
+    for key, value in field_values.items():
+        final_prompt = final_prompt.replace(f"{{{{{key}}}}}", value)
+
+    model_id = template.get("model_id")
+    if not model_id:
+        media_type = template.get("media_type", "Image")
+        if media_type == "Video":
+            model_id = "veo-3.1-fast"
+        elif media_type == "Audio":
+            model_id = "gemini-3.1-flash-lite-preview"
+        else:
+            model_id = "black-forest-labs/flux.2-pro"
+
+    generation_payload = {
+        "user_id": ADMIN_USER_ID,
+        "prompt": final_prompt,
+        "model_id": model_id,
+        "aspect_ratio": "1:1",
+        "quality": "1K",
+        "is_public": False,
+        "skip_enhancement": False,
+        "context_enabled": False,
+    }
+    if template.get("before_image_url"):
+        generation_payload["image_url"] = template["before_image_url"]
+
+    async with httpx.AsyncClient(timeout=120.0) as http_client:
+        try:
+            gen_resp = await http_client.post(
+                f"{MAIN_BACKEND_URL}/api/v1/generate",
+                json=generation_payload,
+                headers={"Content-Type": "application/json"}
+            )
+            gen_resp.raise_for_status()
+            gen_data = gen_resp.json()
+        except Exception as e:
+            raise HTTPException(502, f"Generation API error: {str(e)}")
+
+    output_url = gen_data.get("url") or gen_data.get("image_url")
+    if not output_url:
+        raise HTTPException(500, "Generation API did not return a valid URL")
+
+    supabase.table("creator_templates").update({"after_image_url": output_url}).eq("id", template_id).execute()
+
+    return {
+        "output_url": output_url,
+        "remaining_balance": gen_data.get("remaining_balance", 0),
+        "full_response": gen_data
+    }
 
 @app.get("/api/template/ideas")
 async def list_ideas(stage: Optional[str] = None, user=Depends(get_current_user)):
