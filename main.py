@@ -65,8 +65,7 @@ async def admin_required(current_user=Depends(get_current_user)):
 
 # ==================== Helper: Call LLM (Gemini or OpenRouter) ====================
 def _gemini_api_version(model_name: str) -> str:
-    """gemini-3.1-flash-preview requires v1; all other 3.x preview models use v1beta."""
-    return "v1" if model_name == "gemini-3.1-flash-preview" else "v1beta"
+    return "v1beta"
 
 async def call_llm(model_name: str, system_prompt: str, user_prompt: str, image_url: Optional[str] = None, image_base64: Optional[str] = None, temperature: float = 0.7) -> str:
     # Direct Gemini
@@ -204,7 +203,7 @@ async def stage1_generate_ideas(request: Request, user=Depends(get_current_user)
         pass
     system = "You are an expert product manager. Generate 5 fresh template ideas for an AI image/video generation platform, focusing on Ethiopian and African cultural themes. Return ONLY a valid JSON array with fields: title, description, media_type (Image/Video/Audio)."
     user_prompt = "Generate creative template ideas for the Ethiopian market."
-    model = body.get("model") or "gemini-3.1-flash-preview"
+    model = body.get("model") or "gemini-3.1-flash-lite-preview"
     try:
         ai_text = await call_llm(model, system, user_prompt, temperature=0.8)
         # extract JSON
@@ -229,7 +228,7 @@ async def stage1_generate_ideas(request: Request, user=Depends(get_current_user)
 async def stage2_convert_ideas(request: Request, user=Depends(get_current_user)):
     body = await request.json()
     idea_ids = body.get("idea_ids", [])
-    stage2_model = body.get("model") or "gemini-3.1-flash-preview"
+    stage2_model = body.get("model") or "gemini-3.1-flash-lite-preview"
     if not idea_ids:
         raise HTTPException(400, "No idea IDs")
     import json as _json
@@ -328,7 +327,7 @@ async def test_template_generation(request: Request, user=Depends(get_current_us
     body = await request.json()
     template_id = body.get("template_id")
     field_values = body.get("field_values", {})
-    model = body.get("model", "gemini-3.1-flash-preview")
+    model = body.get("model", "gemini-3.1-flash-lite-preview")
     if not template_id:
         raise HTTPException(400, "template_id required")
     tpl_res = supabase.table("creator_templates").select("*").eq("id", template_id).execute()
@@ -536,11 +535,11 @@ async def upload_image(
 async def analyze_images(request: Request, user=Depends(get_current_user)):
     """
     Analyze a list of image URLs with a chosen model and prompt.
-    Body: { "image_urls": ["url1", ...], "model": "gemini-3.1-flash-preview", "prompt": "...", "save_to_db": true }
+    Body: { "image_urls": ["url1", ...], "model": "gemini-3.1-flash-lite-preview", "prompt": "...", "save_to_db": true }
     """
     body = await request.json()
     image_urls = body.get("image_urls", [])
-    model = body.get("model", "gemini-3.1-flash-preview")
+    model = body.get("model", "gemini-3.1-flash-lite-preview")
     prompt = body.get("prompt", "Describe this image in detail for cultural context.")
     save_to_db = body.get("save_to_db", True)
     
@@ -622,7 +621,7 @@ async def analyze_single_image(request: Request, user=Depends(get_current_user))
     """Analyze a single image with optional human annotation context."""
     body = await request.json()
     image_url = body.get("image_url")
-    model = body.get("model", "gemini-3.1-flash-preview")
+    model = body.get("model", "gemini-3.1-flash-lite-preview")
     base_prompt = body.get("prompt", "Describe this image in detail for cultural context.")
     human_context = body.get("human_context", "").strip()
     save_to_db = body.get("save_to_db", True)
