@@ -64,12 +64,16 @@ async def admin_required(current_user=Depends(get_current_user)):
     return current_user
 
 # ==================== Helper: Call LLM (Gemini or OpenRouter) ====================
+def _gemini_api_version(model_name: str) -> str:
+    """gemini-3.1-flash-preview requires v1; all other 3.x preview models use v1beta."""
+    return "v1" if model_name == "gemini-3.1-flash-preview" else "v1beta"
+
 async def call_llm(model_name: str, system_prompt: str, user_prompt: str, image_url: Optional[str] = None, image_base64: Optional[str] = None, temperature: float = 0.7) -> str:
     # Direct Gemini
     if model_name.startswith("gemini-"):
         if not GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY missing")
-        client = genai.Client(api_key=GEMINI_API_KEY, http_options={"api_version": "v1"})
+        client = genai.Client(api_key=GEMINI_API_KEY, http_options={"api_version": _gemini_api_version(model_name)})
         parts = [system_prompt + "\n\n" + user_prompt]
         if image_url:
             # download image
@@ -558,7 +562,7 @@ async def analyze_images(request: Request, user=Depends(get_current_user)):
             # Call Gemini vision
             from google import genai
             from google.genai import types
-            client = genai.Client(api_key=GEMINI_API_KEY, http_options={"api_version": "v1"})
+            client = genai.Client(api_key=GEMINI_API_KEY, http_options={"api_version": _gemini_api_version(model)})
             # Download image
             async with httpx.AsyncClient() as http:
                 resp = await http.get(url, timeout=30)
@@ -647,7 +651,7 @@ async def analyze_single_image(request: Request, user=Depends(get_current_user))
     try:
         from google import genai
         from google.genai import types
-        client = genai.Client(api_key=GEMINI_API_KEY, http_options={"api_version": "v1"})
+        client = genai.Client(api_key=GEMINI_API_KEY, http_options={"api_version": _gemini_api_version(model)})
         async with httpx.AsyncClient() as http:
             resp = await http.get(image_url, timeout=30)
             resp.raise_for_status()
