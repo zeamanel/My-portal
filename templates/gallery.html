@@ -1,226 +1,301 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Gallery – 5 per page</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>Cultural Image Gallery</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
 
-        body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background: #0f172a;
-            color: #e2e8f0;
-            margin: 0;
-            padding: 20px;
-        }
+        .navbar { background: #1e293b; padding: 14px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; }
+        .navbar strong { color: #38bdf8; font-size: 16px; }
+        .navbar a { color: #94a3b8; text-decoration: none; margin-left: 20px; font-size: 13px; font-weight: 600; }
+        .navbar a:hover { color: #38bdf8; }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
+        .container { max-width: 1300px; margin: 24px auto; padding: 0 20px; }
+
+        /* ── Filter bar ── */
+        .filter-bar {
             background: #1e293b;
-            border-radius: 24px;
-            padding: 24px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border: 1px solid #334155;
+            border-radius: 14px;
+            padding: 16px 20px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
         }
-
-        h1 {
-            margin-top: 0;
-            color: #38bdf8;
+        .search-wrap {
+            flex: 1;
+            min-width: 200px;
+            position: relative;
         }
+        .search-wrap i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #475569; font-size: 14px; pointer-events: none; }
+        .search-wrap input {
+            width: 100%;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 9px 12px 9px 36px;
+            color: #e2e8f0;
+            font-size: 13px;
+        }
+        .search-wrap input:focus { outline: none; border-color: #38bdf8; }
+        .search-wrap input::placeholder { color: #475569; }
 
+        select {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 9px 12px;
+            color: #e2e8f0;
+            font-size: 13px;
+        }
+        select:focus { outline: none; border-color: #38bdf8; }
+
+        .filter-meta { font-size: 12px; color: #64748b; margin-left: auto; white-space: nowrap; }
+
+        /* ── Gallery grid ── */
         .gallery {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 20px;
-            margin: 20px 0;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 16px;
         }
 
         .card {
-            background: #0f172a;
+            background: #1e293b;
+            border: 1px solid #334155;
             border-radius: 12px;
             overflow: hidden;
-            transition: transform 0.2s;
-        }
-
-        .card:hover {
-            transform: translateY(-4px);
-        }
-
-        .card img {
-            width: 100%;
-            height: 180px;
-            object-fit: cover;
-            display: block;
-        }
-
-        .card .info {
-            padding: 10px;
-            font-size: 12px;
-            color: #94a3b8;
-        }
-
-        .pagination {
-            display: flex;
-            justify-content: center;
-            gap: 16px;
-            margin-top: 20px;
-        }
-
-        button {
-            background: #38bdf8;
-            border: none;
-            color: #0f172a;
-            padding: 8px 20px;
-            border-radius: 40px;
-            font-weight: bold;
+            transition: transform 0.2s, border-color 0.2s;
             cursor: pointer;
-            transition: 0.2s;
         }
-
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .card:hover { transform: translateY(-3px); border-color: #475569; }
+        .card img { width: 100%; height: 170px; object-fit: cover; display: block; background: #0f172a; }
+        .card .info { padding: 10px; font-size: 12px; color: #94a3b8; line-height: 1.5; }
+        .card .info .badge {
+            display: inline-block;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 4px;
+            padding: 1px 6px;
+            font-size: 11px;
+            color: #64748b;
+            margin-bottom: 5px;
+            margin-right: 4px;
         }
+        .card .info .desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
-        button:hover:not(:disabled) {
-            background: #0ea5e9;
-        }
-
-        .loader {
-            text-align: center;
-            padding: 40px;
-            color: #94a3b8;
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
+        /* overlay spinner — shown OVER existing cards, no blank screen */
+        .gallery-wrap { position: relative; }
+        .loading-overlay {
+            display: none;
+            position: absolute;
+            inset: 0;
+            background: rgba(15,23,42,0.6);
+            border-radius: 12px;
             align-items: center;
-            margin-bottom: 20px;
+            justify-content: center;
+            font-size: 13px;
+            color: #94a3b8;
+            z-index: 10;
         }
+        .loading-overlay.visible { display: flex; }
 
-        .logout-btn {
-            background: #ef4444;
-            color: white;
+        .empty-state { grid-column: 1/-1; text-align: center; padding: 60px 20px; color: #475569; }
+        .empty-state i { font-size: 2.5em; display: block; margin-bottom: 12px; color: #334155; }
+
+        /* ── Pagination ── */
+        .pagination { display: flex; justify-content: center; align-items: center; gap: 16px; margin-top: 24px; }
+        .pagination button {
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: #e2e8f0;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.15s;
         }
+        .pagination button:hover:not(:disabled) { background: #334155; }
+        .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .pagination span { font-size: 13px; color: #64748b; }
 
-        .login-prompt {
-            text-align: center;
-            padding: 40px;
+        @media (max-width: 600px) {
+            .filter-bar { flex-direction: column; align-items: stretch; }
+            .filter-meta { margin-left: 0; }
         }
     </style>
 </head>
-
 <body>
-    <div class="container" id="app">
-        <div class="header">
-            <h1>📸 Cultural Image Gallery</h1>
-            <button id="logoutBtn" class="logout-btn" style="display:none;">Logout</button>
+
+<div class="navbar">
+    <strong>📸 Cultural Gallery</strong>
+    <div>
+        <a href="/ocr">OCR Builder</a>
+        <a href="/ugc-analysis">Annotate</a>
+        <a href="/template-factory">Templates</a>
+        <a href="/" id="logoutBtn">Logout</a>
+    </div>
+</div>
+
+<div class="container">
+
+    <div class="filter-bar">
+        <div class="search-wrap">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchInput" placeholder="Search descriptions…" autocomplete="off">
+        </div>
+        <select id="countryFilter">
+            <option value="">🌍 All Countries</option>
+            <option value="ET">🇪🇹 Ethiopia</option>
+            <option value="EG">🇪🇬 Egypt</option>
+            <option value="KE">🇰🇪 Kenya</option>
+            <option value="NG">🇳🇬 Nigeria</option>
+            <option value="VN">🇻🇳 Vietnam</option>
+        </select>
+        <select id="folderFilter">
+            <option value="">📂 All Folders</option>
+            <option value="architecture">Architecture</option>
+            <option value="street-scenes">Street Scenes</option>
+            <option value="fashion">Fashion</option>
+            <option value="landscapes">Landscapes</option>
+            <option value="lifestyle">Lifestyle</option>
+            <option value="food">Food</option>
+            <option value="markets">Markets</option>
+            <option value="general">General</option>
+        </select>
+        <span class="filter-meta" id="filterMeta"></span>
+    </div>
+
+    <div class="gallery-wrap">
+        <div class="loading-overlay" id="loadingOverlay">
+            <span><i class="fas fa-spinner fa-spin" style="margin-right:8px;"></i>Loading…</span>
         </div>
         <div class="gallery" id="gallery">
-            <div class="loader">Checking authentication...</div>
-        </div>
-        <div class="pagination" id="pagination" style="display:none;">
-            <button id="prevBtn" disabled>← Previous</button>
-            <span id="pageIndicator" style="line-height: 36px;">Page 1</span>
-            <button id="nextBtn">Next →</button>
+            <div class="empty-state">
+                <i class="fas fa-images"></i>
+                Checking authentication…
+            </div>
         </div>
     </div>
 
-    <script>
-        const supabaseUrl = "https://vjcumvumnnvgncnbbtzk.supabase.co";
-        const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqY3VtdnVtbm52Z25jbmJidHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5MjQwOTMsImV4cCI6MjA4MzUwMDA5M30.6YtPHl9EXnRNDtdUIMkNbLLyUvuk9hG3k1gHjn14qd4";
-        const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
-        let currentUser = null;
-        let currentPage = 1;
-        let hasPrev = false;
-        let hasNext = false;
+    <div class="pagination" id="pagination" style="display:none;">
+        <button id="prevBtn" disabled><i class="fas fa-chevron-left"></i> Prev</button>
+        <span id="pageIndicator">Page 1</span>
+        <button id="nextBtn">Next <i class="fas fa-chevron-right"></i></button>
+    </div>
 
-        async function checkAuth() {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                document.getElementById('gallery').innerHTML = `<div class="login-prompt">You are not logged in. <a href="/">Sign in</a></div>`;
-                document.getElementById('pagination').style.display = 'none';
-                document.getElementById('logoutBtn').style.display = 'none';
-                return false;
+</div>
+
+<script>
+    const SB_URL = "https://vjcumvumnnvgncnbbtzk.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqY3VtdnVtbm52Z25jbmJidHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5MjQwOTMsImV4cCI6MjA4MzUwMDA5M30.6YtPHl9EXnRNDtdUIMkNbLLyUvuk9hG3k1gHjn14qd4";
+    const sb = window.supabase.createClient(SB_URL, SB_KEY);
+
+    let currentPage = 1;
+    let hasPrev = false;
+    let hasNext = false;
+    let debounceTimer = null;
+
+    async function getToken() {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) { window.location.href = '/'; throw new Error('Not authenticated'); }
+        return session.access_token;
+    }
+
+    async function loadGallery(page = 1) {
+        const gallery   = document.getElementById('gallery');
+        const overlay   = document.getElementById('loadingOverlay');
+        const search    = document.getElementById('searchInput').value.trim();
+        const country   = document.getElementById('countryFilter').value;
+        const folder    = document.getElementById('folderFilter').value;
+
+        overlay.classList.add('visible');   // overlay over existing cards — no blank screen
+
+        try {
+            const token = await getToken();
+            const params = new URLSearchParams({ page, per_page: 12 });
+            if (search)  params.set('search', search);
+            if (country) params.set('country', country);
+            if (folder)  params.set('folder', folder);
+
+            const resp = await fetch(`/api/gallery/images?${params}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (!resp.ok) throw new Error(await resp.text());
+            const data = await resp.json();
+
+            hasPrev = data.has_prev;
+            hasNext = data.has_next;
+            currentPage = data.page;
+
+            document.getElementById('prevBtn').disabled = !hasPrev;
+            document.getElementById('nextBtn').disabled = !hasNext;
+            document.getElementById('pageIndicator').textContent = `Page ${currentPage}`;
+            document.getElementById('pagination').style.display = 'flex';
+
+            const total = data.images.length;
+            document.getElementById('filterMeta').textContent =
+                total ? `${total} image${total !== 1 ? 's' : ''} on this page` : '';
+
+            if (!total) {
+                gallery.innerHTML = `<div class="empty-state"><i class="fas fa-search"></i>No images match your filters</div>`;
+                return;
             }
-            currentUser = session.user;
-            document.getElementById('logoutBtn').style.display = 'block';
-            return true;
-        }
 
-        async function getToken() {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) throw new Error("Not authenticated");
-            return session.access_token;
-        }
-
-        async function loadGallery(page = 1) {
-            const galleryDiv = document.getElementById('gallery');
-            galleryDiv.innerHTML = '<div class="loader">Loading images...</div>';
-            try {
-                const token = await getToken();
-                const resp = await fetch(`/api/gallery/images?page=${page}&per_page=5`, {
-                    headers: { "Authorization": `Bearer ${token}` }
-                });
-                if (!resp.ok) {
-                    if (resp.status === 401) throw new Error("Session expired. Please reload.");
-                    throw new Error(await resp.text());
-                }
-                const data = await resp.json();
-                hasPrev = data.has_prev;
-                hasNext = data.has_next;
-                currentPage = data.page;
-                document.getElementById('prevBtn').disabled = !hasPrev;
-                document.getElementById('nextBtn').disabled = !hasNext;
-                document.getElementById('pageIndicator').innerText = `Page ${currentPage}`;
-                document.getElementById('pagination').style.display = 'flex';
-
-                if (data.images.length === 0) {
-                    galleryDiv.innerHTML = '<div class="loader">No images found. Please scan or upload images first.</div>';
-                    return;
-                }
-                galleryDiv.innerHTML = '';
-                for (const img of data.images) {
-                    const card = document.createElement('div');
-                    card.className = 'card';
-                    card.innerHTML = `
-                    <img src="${img.image_url}" loading="lazy" onerror="this.src='https://placehold.co/400x300?text=Failed+to+load'">
+            gallery.innerHTML = '';
+            for (const img of data.images) {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <img src="${esc(img.image_url)}" loading="lazy"
+                         onerror="this.src='https://placehold.co/400x280/1e293b/475569?text=No+Image'">
                     <div class="info">
-                        📍 ${img.country_code || '?'} / ${img.folder || '?'}<br>
-                        ${img.description ? img.description.substring(0, 80) + '…' : 'No description'}
-                    </div>
-                `;
-                    galleryDiv.appendChild(card);
-                }
-            } catch (err) {
-                galleryDiv.innerHTML = `<div class="loader">Error: ${err.message}</div>`;
+                        <span class="badge">${esc(img.country_code || '?')}</span>
+                        <span class="badge">${esc(img.folder || '?')}</span>
+                        <div class="desc">${esc(img.description || 'No description')}</div>
+                    </div>`;
+                gallery.appendChild(card);
             }
+        } catch (err) {
+            gallery.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i>${esc(err.message)}</div>`;
+        } finally {
+            overlay.classList.remove('visible');
         }
+    }
 
-        document.getElementById('nextBtn').onclick = () => {
-            if (hasNext) loadGallery(currentPage + 1);
-        };
-        document.getElementById('prevBtn').onclick = () => {
-            if (hasPrev) loadGallery(currentPage - 1);
-        };
-        document.getElementById('logoutBtn').onclick = async () => {
-            await supabase.auth.signOut();
-            window.location.href = '/';
-        };
+    function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
-        (async () => {
-            const loggedIn = await checkAuth();
-            if (loggedIn) {
-                loadGallery(1);
-            }
-        })();
-    </script>
+    function onFilterChange() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => loadGallery(1), 350);
+    }
+
+    document.getElementById('searchInput').addEventListener('input', onFilterChange);
+    document.getElementById('countryFilter').addEventListener('change', () => loadGallery(1));
+    document.getElementById('folderFilter').addEventListener('change', () => loadGallery(1));
+    document.getElementById('nextBtn').onclick = () => { if (hasNext) loadGallery(currentPage + 1); };
+    document.getElementById('prevBtn').onclick = () => { if (hasPrev) loadGallery(currentPage - 1); };
+
+    document.getElementById('logoutBtn').addEventListener('click', async e => {
+        e.preventDefault(); await sb.auth.signOut(); window.location.href = '/';
+    });
+
+    (async () => {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) {
+            document.getElementById('gallery').innerHTML =
+                `<div class="empty-state"><i class="fas fa-lock"></i>Please <a href="/" style="color:#38bdf8;">sign in</a> to view the gallery</div>`;
+            return;
+        }
+        await loadGallery(1);
+    })();
+</script>
 </body>
-
 </html>

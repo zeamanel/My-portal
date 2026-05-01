@@ -787,24 +787,26 @@ async def recent_annotations(limit: int = 10, user=Depends(get_current_user)):
 @app.get("/api/gallery/images")
 async def get_gallery_images(
     page: int = 1,
-    per_page: int = 5,
+    per_page: int = 12,
+    search: str = "",
+    country: str = "",
+    folder: str = "",
     user=Depends(get_current_user)
 ):
-    """
-    Paginated list of images from context_images (or oda-brain if empty).
-    Only returns image_url, country_code, folder, description.
-    """
     if not supabase:
         raise HTTPException(500, "Supabase not configured")
 
     offset = (page - 1) * per_page
-    # Fetch per_page+1 to detect whether a next page exists
-    result_with_extra = supabase.table("context_images") \
-        .select("image_url, country_code, folder, description") \
-        .range(offset, offset + per_page) \
-        .execute()
+    query = supabase.table("context_images").select("image_url, country_code, folder, description")
+    if country:
+        query = query.eq("country_code", country)
+    if folder:
+        query = query.eq("folder", folder)
+    if search:
+        query = query.ilike("description", f"%{search}%")
+    result = query.order("created_at", desc=True).range(offset, offset + per_page).execute()
 
-    items = result_with_extra.data
+    items = result.data
     has_next = len(items) > per_page
     images = items[:per_page]
 
