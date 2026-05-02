@@ -233,9 +233,23 @@ async def stage2_convert_ideas(request: Request, user=Depends(get_current_user))
     body = await request.json()
     idea_ids = body.get("idea_ids", [])
     stage2_model = body.get("model") or "gemini-3.1-flash-lite-preview"
+    brief_agent_id = body.get("brief_agent_id")
     if not idea_ids:
         raise HTTPException(400, "No idea IDs")
     import json as _json
+
+    # Load brief agent (and its linked JSON agent) if provided
+    brief_agent = None
+    json_agent = None
+    if brief_agent_id:
+        agent_res = supabase.table("agent_prompts").select("*").eq("id", brief_agent_id).execute()
+        if agent_res.data:
+            brief_agent = agent_res.data[0]
+            json_agent_id = brief_agent.get("json_agent_id")
+            if json_agent_id:
+                ja_res = supabase.table("agent_prompts").select("*").eq("id", json_agent_id).execute()
+                if ja_res.data:
+                    json_agent = ja_res.data[0]
 
     def extract_json_obj(text: str) -> dict:
         """Strip markdown fences then parse the first {...} block."""
@@ -253,20 +267,34 @@ async def stage2_convert_ideas(request: Request, user=Depends(get_current_user))
     for idea in ideas:
         try:
             # Pass 1: creative brief
-            sys_prompt = "You are a senior creative director. Write a creative brief for this template idea."
+            if brief_agent:
+                p1_system = brief_agent.get("system_prompt", "You are a senior creative director. Write a creative brief for this template idea.")
+                p1_model  = brief_agent.get("model_name") or stage2_model
+                p1_temp   = brief_agent.get("temperature", 0.7)
+            else:
+                p1_system = "You are a senior creative director. Write a creative brief for this template idea."
+                p1_model  = stage2_model
+                p1_temp   = 0.7
             usr_prompt = f"Idea: {idea['title']}\n{idea['description']}\nMedia: {idea['media_type']}"
-            brief = await call_llm(stage2_model, sys_prompt, usr_prompt, temperature=0.7)
+            brief = await call_llm(p1_model, p1_system, usr_prompt, temperature=p1_temp)
 
             # Pass 2: structured template JSON
-            sys2 = (
-                "You are an AI prompt engineer. Return ONLY a valid JSON object (no markdown, no explanation) with these keys: "
-                "title (string), description (string), prompt_template (string with {{placeholders}}), "
-                "fields (array of objects with: field_name, field_label, field_type, placeholder, is_required, options). "
-                "For fields with field_type 'select', include an 'options' array (list of strings) with 4-6 plausible choices. "
-                "For all other field types, set options to an empty array []."
-            )
+            if json_agent:
+                p2_system = json_agent.get("system_prompt", "")
+                p2_model  = json_agent.get("model_name") or stage2_model
+                p2_temp   = json_agent.get("temperature", 0.5)
+            else:
+                p2_system = (
+                    "You are an AI prompt engineer. Return ONLY a valid JSON object (no markdown, no explanation) with these keys: "
+                    "title (string), description (string), prompt_template (string with {{placeholders}}), "
+                    "fields (array of objects with: field_name, field_label, field_type, placeholder, is_required, options). "
+                    "For fields with field_type 'select', include an 'options' array (list of strings) with 4-6 plausible choices. "
+                    "For all other field types, set options to an empty array []."
+                )
+                p2_model  = stage2_model
+                p2_temp   = 0.5
             usr2 = f"Brief:\n{brief}\nMedia type: {idea['media_type']}"
-            raw_json = await call_llm(stage2_model, sys2, usr2, temperature=0.5)
+            raw_json = await call_llm(p2_model, p2_system, usr2, temperature=p2_temp)
 
             enriched = extract_json_obj(raw_json)
 

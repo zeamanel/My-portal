@@ -136,6 +136,12 @@
     <div class="card">
         <h2><i class="fas fa-cogs"></i> Stage 2 — Convert to Templates</h2>
         <p style="font-size:13px;color:#64748b;margin-bottom:14px;">Select raw ideas from Stage 1 and convert them into full <code>creator_templates</code> with fields.</p>
+        <div class="form-row" style="margin-bottom:12px;">
+            <label style="font-size:12px;color:#94a3b8;font-weight:600;display:block;margin-bottom:5px;">Creative Brief Agent</label>
+            <select id="briefAgentSelect" style="background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 10px;font-size:13px;width:100%;">
+                <option value="">⏳ Loading agents…</option>
+            </select>
+        </div>
         <button class="btn btn-purple" onclick="runStage2()" id="stage2Btn" disabled><i class="fas fa-rocket"></i> Convert Selected Ideas</button>
         <div id="stage2Progress" style="display:none;margin-top:12px;">
             <div style="font-size:12px;color:#94a3b8;" id="stage2Label">Converting…</div>
@@ -375,7 +381,8 @@
             document.getElementById('stage2Fill').style.width = '30%';
             document.getElementById('stage2Label').textContent = 'AI is building templates…';
             const stageModel = document.getElementById('stageModel').value;
-            const data = await api('POST', '/api/template/stage2', { idea_ids: ids, model: stageModel });
+            const briefAgentId = document.getElementById('briefAgentSelect').value || null;
+            const data = await api('POST', '/api/template/stage2', { idea_ids: ids, model: stageModel, brief_agent_id: briefAgentId });
             document.getElementById('stage2Fill').style.width = '100%';
             document.getElementById('stage2Label').textContent = 'Done';
             const errs = data.errors || [];
@@ -576,6 +583,25 @@
     }
 
     // ── Init ──────────────────────────────────────────────
+    // ── Brief Agents ──────────────────────────────────────
+    async function loadBriefAgents() {
+        try {
+            const data = await api('GET', '/api/admin/agents');
+            const agents = (data.agents || []).filter(a => a.json_agent_id);
+            const sel = document.getElementById('briefAgentSelect');
+            if (!agents.length) {
+                sel.innerHTML = '<option value="">No brief agents found</option>';
+                return;
+            }
+            sel.innerHTML = agents.map(a =>
+                `<option value="${escHtml(a.id)}">${escHtml(a.display_name)}</option>`
+            ).join('');
+        } catch (e) {
+            document.getElementById('briefAgentSelect').innerHTML = '<option value="">Failed to load agents</option>';
+            log(`Brief agents load failed: ${e.message}`, 'warn');
+        }
+    }
+
     window.onload = async () => {
         const { data: { session } } = await sb.auth.getSession();
         if (!session) { window.location.href = '/'; return; }
@@ -585,8 +611,7 @@
             await sb.auth.signOut();
             window.location.href = '/';
         });
-        await loadIdeas();
-        await loadTemplates();
+        await Promise.all([loadIdeas(), loadTemplates(), loadBriefAgents()]);
     };
 </script>
 </body>
