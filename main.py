@@ -269,7 +269,7 @@ async def stage2_convert_ideas(request: Request, user=Depends(get_current_user))
             # Pass 1: creative brief
             if brief_agent:
                 p1_system = brief_agent.get("system_prompt", "You are a senior creative director. Write a creative brief for this template idea.")
-                p1_model  = brief_agent.get("model_name") or stage2_model
+                p1_model  = stage2_model
                 p1_temp   = brief_agent.get("temperature", 0.7)
             else:
                 p1_system = "You are a senior creative director. Write a creative brief for this template idea."
@@ -281,7 +281,7 @@ async def stage2_convert_ideas(request: Request, user=Depends(get_current_user))
             # Pass 2: structured template JSON
             if json_agent:
                 p2_system = json_agent.get("system_prompt", "")
-                p2_model  = json_agent.get("model_name") or stage2_model
+                p2_model  = stage2_model
                 p2_temp   = json_agent.get("temperature", 0.5)
             else:
                 p2_system = (
