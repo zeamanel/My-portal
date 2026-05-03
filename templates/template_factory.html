@@ -593,9 +593,12 @@
                 sel.innerHTML = '<option value="">No models found</option>';
                 return;
             }
-            sel.innerHTML = models.map(m =>
-                `<option value="${escHtml(m.model_id)}">${escHtml(m.name)}${m.provider ? ' — ' + escHtml(m.provider) : ''}</option>`
-            ).join('');
+            sel.innerHTML = models.map(m => {
+                const val  = m.model_id || m.id || '';
+                const label = m.name || m.display_name || m.model_id || m.id || 'Unknown';
+                const sub  = m.provider || m.service_type || '';
+                return `<option value="${escHtml(val)}">${escHtml(label)}${sub ? ' — ' + escHtml(sub) : ''}</option>`;
+            }).join('');
         } catch (e) {
             document.getElementById('testModel').innerHTML = '<option value="">Failed to load</option>';
             log(`AI models load failed: ${e.message}`, 'warn');
