@@ -446,7 +446,8 @@ async def generate_template_asset(request: Request, user=Depends(get_current_use
     for key, value in field_values.items():
         final_prompt = final_prompt.replace(f"{{{{{key}}}}}", value)
 
-    model_id = template.get("model_id")
+    # Priority: user-selected model > template's saved model > media-type default
+    model_id = body.get("model_id") or template.get("model_id")
     if not model_id:
         media_type = template.get("media_type", "Image")
         if media_type == "Video":
