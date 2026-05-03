@@ -228,6 +228,17 @@ async def stage1_generate_ideas(request: Request, user=Depends(get_current_user)
     except Exception as e:
         raise HTTPException(500, str(e))
 
+# Stage 2 generation paths:
+#
+# SINGLE-PASS (Image/Video + no brief_agent_id):
+#   Skip the creative brief. Call the JSON agent (or hardcoded p2 prompt)
+#   directly with the raw idea title + description.
+#
+# TWO-PASS (brief_agent_id provided, or non-Image/Video media_type):
+#   Pass 1 — brief agent (or hardcoded) writes a creative brief.
+#   Pass 2 — JSON agent (or hardcoded) converts that brief to structured JSON.
+#
+# Model priority: agent row model_name (if non-empty) → stage2_model fallback.
 @app.post("/api/template/stage2")
 async def stage2_convert_ideas(request: Request, user=Depends(get_current_user)):
     body = await request.json()
@@ -252,74 +263,112 @@ async def stage2_convert_ideas(request: Request, user=Depends(get_current_user))
                     json_agent = ja_res.data[0]
 
     def extract_json_obj(text: str) -> dict:
-        """Strip markdown fences then parse the first {...} block."""
-        # Remove ```json ... ``` or ``` ... ``` fences
         text = re.sub(r'```(?:json)?\s*', '', text).replace('```', '')
         match = re.search(r'\{[\s\S]*\}', text)
         if not match:
             raise ValueError("No JSON object found in AI response")
         return _json.loads(match.group())
 
+    def pick_model(agent_row, fallback: str) -> str:
+        """Use agent model_name when non-empty, otherwise use the dropdown fallback."""
+        if agent_row:
+            m = (agent_row.get("model_name") or "").strip()
+            if m:
+                return m
+        return fallback
+
+    _hardcoded_p2 = (
+        "You are an AI prompt engineer. Return ONLY a valid JSON object (no markdown, no explanation) with these keys: "
+        "title (string), description (string), prompt_template (string with {{placeholders}}), "
+        "intent_type (string, e.g. 'marketing', 'educational', 'artistic'), "
+        "target_user (string, e.g. 'photographer', 'marketer'), "
+        "fields (array of objects with: field_name, field_label, field_type, placeholder, is_required, options, "
+        "variable_key (snake_case string matching the {{placeholder}}), variable_values (array of 2-3 example strings)). "
+        "For fields with field_type 'select', include an 'options' array (list of strings) with 4-6 plausible choices. "
+        "For all other field types, set options to []."
+    )
+
     res = supabase.table("template_idea").select("*").in_("id", idea_ids).execute()
     ideas = res.data
     created = 0
     errors = []
+
     for idea in ideas:
         try:
-            # Pass 1: creative brief
-            if brief_agent:
-                p1_system = brief_agent.get("system_prompt", "You are a senior creative director. Write a creative brief for this template idea.")
-                p1_model  = stage2_model
-                p1_temp   = brief_agent.get("temperature", 0.7)
-            else:
-                p1_system = "You are a senior creative director. Write a creative brief for this template idea."
-                p1_model  = stage2_model
-                p1_temp   = 0.7
-            usr_prompt = f"Idea: {idea['title']}\n{idea['description']}\nMedia: {idea['media_type']}"
-            brief = await call_llm(p1_model, p1_system, usr_prompt, temperature=p1_temp)
+            media_type = idea.get("media_type", "Image")
+            single_pass = (media_type in ("Image", "Video")) and not brief_agent_id
 
-            # Pass 2: structured template JSON
-            if json_agent:
-                p2_system = json_agent.get("system_prompt", "")
-                p2_model  = stage2_model
-                p2_temp   = json_agent.get("temperature", 0.5)
-            else:
-                p2_system = (
-                    "You are an AI prompt engineer. Return ONLY a valid JSON object (no markdown, no explanation) with these keys: "
-                    "title (string), description (string), prompt_template (string with {{placeholders}}), "
-                    "fields (array of objects with: field_name, field_label, field_type, placeholder, is_required, options). "
-                    "For fields with field_type 'select', include an 'options' array (list of strings) with 4-6 plausible choices. "
-                    "For all other field types, set options to an empty array []."
+            if single_pass:
+                # ── Single-pass: skip brief, call JSON agent directly ─────
+                p2_system = json_agent.get("system_prompt", _hardcoded_p2) if json_agent else _hardcoded_p2
+                p2_model  = pick_model(json_agent, stage2_model)
+                p2_temp   = float(json_agent.get("temperature") or 0.5) if json_agent else 0.5
+                usr2 = (
+                    f"Generate a template for this use case:\n"
+                    f"{idea.get('title','')}\n{idea.get('description','')}\n"
+                    f"Media type: {media_type}"
                 )
-                p2_model  = stage2_model
-                p2_temp   = 0.5
-            usr2 = f"Brief:\n{brief}\nMedia type: {idea['media_type']}"
-            raw_json = await call_llm(p2_model, p2_system, usr2, temperature=p2_temp)
+                raw_json = await call_llm(p2_model, p2_system, usr2, temperature=p2_temp)
+            else:
+                # ── Two-pass: brief → JSON ────────────────────────────────
+                p1_system = brief_agent.get("system_prompt", "You are a senior creative director. Write a creative brief for this template idea.") if brief_agent else "You are a senior creative director. Write a creative brief for this template idea."
+                p1_model  = pick_model(brief_agent, stage2_model)
+                p1_temp   = float(brief_agent.get("temperature") or 0.7) if brief_agent else 0.7
+                usr1 = f"Idea: {idea.get('title','')}\n{idea.get('description','')}\nMedia: {media_type}"
+                brief = await call_llm(p1_model, p1_system, usr1, temperature=p1_temp)
+
+                p2_system = json_agent.get("system_prompt", _hardcoded_p2) if json_agent else _hardcoded_p2
+                p2_model  = pick_model(json_agent, stage2_model)
+                p2_temp   = float(json_agent.get("temperature") or 0.5) if json_agent else 0.5
+                usr2 = f"Brief:\n{brief}\nMedia type: {media_type}"
+                raw_json = await call_llm(p2_model, p2_system, usr2, temperature=p2_temp)
 
             enriched = extract_json_obj(raw_json)
 
+            # ── Placeholder validation ────────────────────────────────────
+            prompt_template = enriched.get("prompt_template") or idea.get("description", "")
+            placeholders_in_template = set(re.findall(r'\{\{(\w+)\}\}', prompt_template))
+            field_names = {f.get("field_name", "") for f in enriched.get("fields", [])}
+            missing_fields = placeholders_in_template - field_names
+            orphan_fields  = field_names - placeholders_in_template
+            if missing_fields or orphan_fields:
+                parts = []
+                if missing_fields:
+                    parts.append(f"placeholders without fields: {sorted(missing_fields)}")
+                if orphan_fields:
+                    parts.append(f"fields without placeholders: {sorted(orphan_fields)}")
+                errors.append({"idea_id": idea.get("id"), "error": "Placeholder mismatch — " + "; ".join(parts)})
+                continue
+
             tpl_data = {
-                "title": enriched.get("title") or idea["title"],
-                "description": enriched.get("description") or idea.get("description", ""),
-                "prompt_template": enriched.get("prompt_template") or idea.get("description", ""),
-                "media_type": idea.get("media_type", "Image"),
-                "is_published": False,
-                "creator_id": "cf47617f-a205-46ab-9268-d8b816a54758",
-                "base_price_tokens": 10
+                "title":             enriched.get("title") or idea.get("title", ""),
+                "description":       enriched.get("description") or idea.get("description", ""),
+                "prompt_template":   prompt_template,
+                "media_type":        media_type,
+                "is_published":      False,
+                "creator_id":        "cf47617f-a205-46ab-9268-d8b816a54758",
+                "base_price_tokens": 10,
             }
+            if enriched.get("intent_type") is not None:
+                tpl_data["intent_type"] = enriched["intent_type"]
+            if enriched.get("target_user") is not None:
+                tpl_data["target_user"] = enriched["target_user"]
+
             tpl_res = supabase.table("creator_templates").insert(tpl_data).execute()
             if tpl_res.data:
                 template_id = tpl_res.data[0]["id"]
                 for idx, field in enumerate(enriched.get("fields", [])):
                     supabase.table("template_fields").insert({
-                        "template_id": template_id,
-                        "field_name": field.get("field_name", f"field_{idx}"),
-                        "field_label": field.get("field_label") or field.get("field_name", f"Field {idx}"),
-                        "field_type": field.get("field_type", "text"),
-                        "placeholder": field.get("placeholder", ""),
-                        "is_required": bool(field.get("is_required", True)),
-                        "options": field.get("options", []),
-                        "display_order": idx
+                        "template_id":    template_id,
+                        "field_name":     field.get("field_name", f"field_{idx}"),
+                        "field_label":    field.get("field_label") or field.get("field_name", f"Field {idx}"),
+                        "field_type":     field.get("field_type", "text"),
+                        "placeholder":    field.get("placeholder", ""),
+                        "is_required":    bool(field.get("is_required", True)),
+                        "options":        field.get("options", []),
+                        "variable_key":   field.get("variable_key", ""),
+                        "variable_values": field.get("variable_values", []),
+                        "display_order":  idx,
                     }).execute()
                 supabase.table("template_idea").update({"stage": "processed"}).eq("id", idea["id"]).execute()
                 created += 1
