@@ -186,8 +186,7 @@
                     <div class="form-row">
                         <label>Model</label>
                         <select id="testModel">
-                            <option value="gemini-3.1-flash-lite-preview" selected>⚡ Gemini 3.1 Flash Lite</option>
-                            <option value="gemini-3.1-pro-preview">🏆 Gemini 3.1 Pro</option>
+                            <option value="">⏳ Loading models…</option>
                         </select>
                     </div>
 
@@ -583,6 +582,25 @@
     }
 
     // ── Init ──────────────────────────────────────────────
+    // ── Test Model selector ───────────────────────────────
+    async function loadTestModels() {
+        try {
+            const data = await api('GET', '/api/admin/ai-models');
+            const models = data.models || [];
+            const sel = document.getElementById('testModel');
+            if (!models.length) {
+                sel.innerHTML = '<option value="">No models found</option>';
+                return;
+            }
+            sel.innerHTML = models.map(m =>
+                `<option value="${escHtml(m.model_id)}">${escHtml(m.name)}${m.provider ? ' — ' + escHtml(m.provider) : ''}</option>`
+            ).join('');
+        } catch (e) {
+            document.getElementById('testModel').innerHTML = '<option value="">Failed to load</option>';
+            log(`AI models load failed: ${e.message}`, 'warn');
+        }
+    }
+
     // ── Brief Agents ──────────────────────────────────────
     async function loadBriefAgents() {
         try {
@@ -611,7 +629,7 @@
             await sb.auth.signOut();
             window.location.href = '/';
         });
-        await Promise.all([loadIdeas(), loadTemplates(), loadBriefAgents()]);
+        await Promise.all([loadIdeas(), loadTemplates(), loadBriefAgents(), loadTestModels()]);
     };
 </script>
 </body>
