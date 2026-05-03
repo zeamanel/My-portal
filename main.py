@@ -350,10 +350,6 @@ async def stage2_convert_ideas(request: Request, user=Depends(get_current_user))
                 "creator_id":        "cf47617f-a205-46ab-9268-d8b816a54758",
                 "base_price_tokens": 10,
             }
-            if enriched.get("intent_type") is not None:
-                tpl_data["intent_type"] = enriched["intent_type"]
-            if enriched.get("target_user") is not None:
-                tpl_data["target_user"] = enriched["target_user"]
 
             tpl_res = supabase.table("creator_templates").insert(tpl_data).execute()
             if tpl_res.data:
