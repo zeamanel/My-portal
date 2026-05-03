@@ -510,7 +510,14 @@ async def admin_list_agents(admin=Depends(admin_required)):
 
 @app.get("/api/admin/ai-models")
 async def admin_list_ai_models(admin=Depends(admin_required)):
-    res = supabase.table("ai_models").select("*").execute()
+    res = (supabase.table("ai_models")
+           .select("model_id, display_name, media_type, provider, service_type")
+           .eq("is_active", True)
+           .eq("show_in_creator", True)
+           .neq("media_type", "Text")
+           .order("media_type")
+           .order("display_name")
+           .execute())
     return {"models": res.data}
 
 @app.post("/api/admin/agents")

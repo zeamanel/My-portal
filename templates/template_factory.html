@@ -593,12 +593,18 @@
                 sel.innerHTML = '<option value="">No models found</option>';
                 return;
             }
-            sel.innerHTML = models.map(m => {
-                const val  = m.model_id || m.id || '';
-                const label = m.name || m.display_name || m.model_id || m.id || 'Unknown';
-                const sub  = m.provider || m.service_type || '';
-                return `<option value="${escHtml(val)}">${escHtml(label)}${sub ? ' — ' + escHtml(sub) : ''}</option>`;
-            }).join('');
+            // Group by media_type
+            const groups = {};
+            models.forEach(m => {
+                const g = m.media_type || 'Other';
+                if (!groups[g]) groups[g] = [];
+                groups[g].push(m);
+            });
+            sel.innerHTML = Object.entries(groups).map(([type, items]) =>
+                `<optgroup label="── ${escHtml(type)} ──">` +
+                items.map(m => `<option value="${escHtml(m.model_id)}">${escHtml(m.display_name)}</option>`).join('') +
+                `</optgroup>`
+            ).join('');
         } catch (e) {
             document.getElementById('testModel').innerHTML = '<option value="">Failed to load</option>';
             log(`AI models load failed: ${e.message}`, 'warn');
