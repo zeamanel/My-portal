@@ -326,19 +326,20 @@ async def stage2_convert_ideas(request: Request, user=Depends(get_current_user))
             enriched = extract_json_obj(raw_json)
 
             # ── Placeholder validation ────────────────────────────────────
+            # Only hard-fail on missing_fields: a {{placeholder}} with no
+            # matching field means the prompt can never be filled correctly.
+            # Orphan fields (UI-only inputs like headline_text, color_palette)
+            # are valid — they may be used client-side and not in the prompt.
             prompt_template = enriched.get("prompt_template") or idea.get("description", "")
             placeholders_in_template = set(re.findall(r'\{\{(\w+)\}\}', prompt_template))
             field_names = {f.get("field_name", "") for f in enriched.get("fields", [])}
             missing_fields = placeholders_in_template - field_names
             orphan_fields  = field_names - placeholders_in_template
-            if missing_fields or orphan_fields:
-                parts = []
-                if missing_fields:
-                    parts.append(f"placeholders without fields: {sorted(missing_fields)}")
-                if orphan_fields:
-                    parts.append(f"fields without placeholders: {sorted(orphan_fields)}")
-                errors.append({"idea_id": idea.get("id"), "error": "Placeholder mismatch — " + "; ".join(parts)})
+            if missing_fields:
+                errors.append({"idea_id": idea.get("id"), "error": f"Placeholder mismatch — placeholders without fields: {sorted(missing_fields)}"})
                 continue
+            if orphan_fields:
+                print(f"[stage2] idea {idea.get('id')}: UI-only fields (no placeholder): {sorted(orphan_fields)}")
 
             tpl_data = {
                 "title":             enriched.get("title") or idea.get("title", ""),
