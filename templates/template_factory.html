@@ -605,13 +605,9 @@
     // ── Brief Agents ──────────────────────────────────────
     async function loadBriefAgents() {
         try {
-            const data = await api('GET', '/api/admin/agents');
+            const data = await api('GET', '/api/admin/agents?stage_use=brief');
             const agents = data.agents || [];
             const sel = document.getElementById('briefAgentSelect');
-            if (!agents.length) {
-                sel.innerHTML = '<option value="">No agents found</option>';
-                return;
-            }
             sel.innerHTML = '<option value="">None (skip brief pass)</option>' +
                 agents.map(a => `<option value="${escHtml(a.id)}">${escHtml(a.display_name)}</option>`).join('');
         } catch (e) {
@@ -622,7 +618,7 @@
 
     async function loadJsonAgents() {
         try {
-            const data = await api('GET', '/api/admin/agents');
+            const data = await api('GET', '/api/admin/agents?stage_use=json');
             const agents = data.agents || [];
             const sel = document.getElementById('jsonAgentSelect');
             sel.innerHTML = '<option value="">None (use hardcoded fallback)</option>' +

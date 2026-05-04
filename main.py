@@ -511,8 +511,11 @@ async def list_ideas(stage: Optional[str] = None, user=Depends(get_current_user)
 
 # ==================== Admin Endpoints ====================
 @app.get("/api/admin/agents")
-async def admin_list_agents(admin=Depends(admin_required)):
-    res = supabase.table("agent_prompts").select("*").execute()
+async def admin_list_agents(stage_use: Optional[str] = None, admin=Depends(admin_required)):
+    query = supabase.table("agent_prompts").select("*")
+    if stage_use:
+        query = query.eq("stage_use", stage_use)
+    res = query.execute()
     return {"agents": res.data}
 
 @app.get("/api/admin/ai-models")
