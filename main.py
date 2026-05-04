@@ -209,12 +209,12 @@ async def stage1_generate_ideas(request: Request, user=Depends(get_current_user)
     user_prompt = "Generate creative template ideas for the Ethiopian market."
     model = body.get("model") or "gemini-3.1-flash-lite-preview"
     try:
+        import json as _json
         ai_text = await call_llm(model, system, user_prompt, temperature=0.8)
-        # extract JSON
-        match = re.search(r'\[[\s\S]*\]', ai_text)
+        match = re.search(r'\[[\s\S]*\]', re.sub(r'```(?:json)?\s*', '', ai_text).replace('```', ''))
         if not match:
             raise ValueError("No JSON array found")
-        ideas = eval(match.group())
+        ideas = _json.loads(match.group())
         for idea in ideas:
             supabase.table("template_idea").insert({
                 "stage": "raw",
