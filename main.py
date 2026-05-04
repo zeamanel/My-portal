@@ -307,11 +307,27 @@ async def stage2_convert_ideas(request: Request, user=Depends(get_current_user))
             media_type = idea.get("media_type", "Image")
             idea_ctx = f"{idea.get('title','')}\n{idea.get('description','')}\nMedia type: {media_type}"
 
-            if json_agent and not brief_agent:
+            # Per-idea agent: start with the UI-selected json_agent, then check
+            # route_to_agent in raw_input_analysis (only when no brief_agent_id).
+            idea_json_agent = json_agent
+            if not brief_agent_id:
+                raw_analysis = idea.get("raw_input_analysis") or {}
+                if isinstance(raw_analysis, str):
+                    try:
+                        raw_analysis = _json.loads(raw_analysis)
+                    except Exception:
+                        raw_analysis = {}
+                route_slug = raw_analysis.get("route_to_agent")
+                if route_slug:
+                    slug_res = supabase.table("agent_prompts").select("*").eq("slug", route_slug).execute()
+                    if slug_res.data:
+                        idea_json_agent = slug_res.data[0]
+
+            if idea_json_agent and not brief_agent:
                 # ── Direct JSON agent: single-pass ────────────────────────
-                p2_system = json_agent.get("system_prompt", _hardcoded_p2)
-                p2_model  = pick_model(json_agent, stage2_model)
-                p2_temp   = float(json_agent.get("temperature") or 0.5)
+                p2_system = idea_json_agent.get("system_prompt", _hardcoded_p2)
+                p2_model  = pick_model(idea_json_agent, stage2_model)
+                p2_temp   = float(idea_json_agent.get("temperature") or 0.5)
                 raw_json = await call_llm(p2_model, p2_system, f"Generate a template for:\n{idea_ctx}", temperature=p2_temp)
 
             elif brief_agent:
@@ -321,9 +337,9 @@ async def stage2_convert_ideas(request: Request, user=Depends(get_current_user))
                 p1_temp   = float(brief_agent.get("temperature") or 0.7)
                 brief = await call_llm(p1_model, p1_system, f"Idea: {idea_ctx}", temperature=p1_temp)
 
-                p2_system = json_agent.get("system_prompt", _hardcoded_p2) if json_agent else _hardcoded_p2
-                p2_model  = pick_model(json_agent, stage2_model) if json_agent else stage2_model
-                p2_temp   = float(json_agent.get("temperature") or 0.5) if json_agent else 0.5
+                p2_system = idea_json_agent.get("system_prompt", _hardcoded_p2) if idea_json_agent else _hardcoded_p2
+                p2_model  = pick_model(idea_json_agent, stage2_model) if idea_json_agent else stage2_model
+                p2_temp   = float(idea_json_agent.get("temperature") or 0.5) if idea_json_agent else 0.5
                 raw_json = await call_llm(p2_model, p2_system, f"Brief:\n{brief}\nMedia type: {media_type}", temperature=p2_temp)
 
             else:
