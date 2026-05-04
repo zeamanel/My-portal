@@ -245,22 +245,31 @@ async def stage2_convert_ideas(request: Request, user=Depends(get_current_user))
     idea_ids = body.get("idea_ids", [])
     stage2_model = body.get("model") or "gemini-3.1-flash-lite-preview"
     brief_agent_id = body.get("brief_agent_id")
+    json_agent_id  = body.get("json_agent_id")
     if not idea_ids:
         raise HTTPException(400, "No idea IDs")
     import json as _json
 
-    # Load brief agent (and its linked JSON agent) if provided
     brief_agent = None
     json_agent = None
+
+    # Load directly-selected JSON agent first
+    if json_agent_id:
+        ja_res = supabase.table("agent_prompts").select("*").eq("id", json_agent_id).execute()
+        if ja_res.data:
+            json_agent = ja_res.data[0]
+
+    # Load brief agent; its linked json_agent_id only fills in if no direct selection
     if brief_agent_id:
         agent_res = supabase.table("agent_prompts").select("*").eq("id", brief_agent_id).execute()
         if agent_res.data:
             brief_agent = agent_res.data[0]
-            json_agent_id = brief_agent.get("json_agent_id")
-            if json_agent_id:
-                ja_res = supabase.table("agent_prompts").select("*").eq("id", json_agent_id).execute()
-                if ja_res.data:
-                    json_agent = ja_res.data[0]
+            if json_agent is None:
+                linked_id = brief_agent.get("json_agent_id")
+                if linked_id:
+                    ja_res = supabase.table("agent_prompts").select("*").eq("id", linked_id).execute()
+                    if ja_res.data:
+                        json_agent = ja_res.data[0]
 
     def extract_json_obj(text: str) -> dict:
         text = re.sub(r'```(?:json)?\s*', '', text).replace('```', '')
@@ -296,32 +305,30 @@ async def stage2_convert_ideas(request: Request, user=Depends(get_current_user))
     for idea in ideas:
         try:
             media_type = idea.get("media_type", "Image")
-            single_pass = (media_type in ("Image", "Video")) and not brief_agent_id
+            idea_ctx = f"{idea.get('title','')}\n{idea.get('description','')}\nMedia type: {media_type}"
 
-            if single_pass:
-                # ── Single-pass: skip brief, call JSON agent directly ─────
-                p2_system = json_agent.get("system_prompt", _hardcoded_p2) if json_agent else _hardcoded_p2
+            if json_agent and not brief_agent:
+                # ── Direct JSON agent: single-pass ────────────────────────
+                p2_system = json_agent.get("system_prompt", _hardcoded_p2)
                 p2_model  = pick_model(json_agent, stage2_model)
-                p2_temp   = float(json_agent.get("temperature") or 0.5) if json_agent else 0.5
-                usr2 = (
-                    f"Generate a template for this use case:\n"
-                    f"{idea.get('title','')}\n{idea.get('description','')}\n"
-                    f"Media type: {media_type}"
-                )
-                raw_json = await call_llm(p2_model, p2_system, usr2, temperature=p2_temp)
-            else:
+                p2_temp   = float(json_agent.get("temperature") or 0.5)
+                raw_json = await call_llm(p2_model, p2_system, f"Generate a template for:\n{idea_ctx}", temperature=p2_temp)
+
+            elif brief_agent:
                 # ── Two-pass: brief → JSON ────────────────────────────────
-                p1_system = brief_agent.get("system_prompt", "You are a senior creative director. Write a creative brief for this template idea.") if brief_agent else "You are a senior creative director. Write a creative brief for this template idea."
+                p1_system = brief_agent.get("system_prompt", "You are a senior creative director. Write a creative brief.")
                 p1_model  = pick_model(brief_agent, stage2_model)
-                p1_temp   = float(brief_agent.get("temperature") or 0.7) if brief_agent else 0.7
-                usr1 = f"Idea: {idea.get('title','')}\n{idea.get('description','')}\nMedia: {media_type}"
-                brief = await call_llm(p1_model, p1_system, usr1, temperature=p1_temp)
+                p1_temp   = float(brief_agent.get("temperature") or 0.7)
+                brief = await call_llm(p1_model, p1_system, f"Idea: {idea_ctx}", temperature=p1_temp)
 
                 p2_system = json_agent.get("system_prompt", _hardcoded_p2) if json_agent else _hardcoded_p2
-                p2_model  = pick_model(json_agent, stage2_model)
+                p2_model  = pick_model(json_agent, stage2_model) if json_agent else stage2_model
                 p2_temp   = float(json_agent.get("temperature") or 0.5) if json_agent else 0.5
-                usr2 = f"Brief:\n{brief}\nMedia type: {media_type}"
-                raw_json = await call_llm(p2_model, p2_system, usr2, temperature=p2_temp)
+                raw_json = await call_llm(p2_model, p2_system, f"Brief:\n{brief}\nMedia type: {media_type}", temperature=p2_temp)
+
+            else:
+                # ── Hardcoded fallback: single-pass ───────────────────────
+                raw_json = await call_llm(stage2_model, _hardcoded_p2, f"Generate a template for:\n{idea_ctx}", temperature=0.5)
 
             enriched = extract_json_obj(raw_json)
 

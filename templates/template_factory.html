@@ -136,11 +136,19 @@
     <div class="card">
         <h2><i class="fas fa-cogs"></i> Stage 2 — Convert to Templates</h2>
         <p style="font-size:13px;color:#64748b;margin-bottom:14px;">Select raw ideas from Stage 1 and convert them into full <code>creator_templates</code> with fields.</p>
-        <div class="form-row" style="margin-bottom:12px;">
-            <label style="font-size:12px;color:#94a3b8;font-weight:600;display:block;margin-bottom:5px;">Creative Brief Agent</label>
-            <select id="briefAgentSelect" style="background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 10px;font-size:13px;width:100%;">
-                <option value="">⏳ Loading agents…</option>
-            </select>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+            <div class="form-row" style="margin-bottom:0;">
+                <label style="font-size:12px;color:#94a3b8;font-weight:600;display:block;margin-bottom:5px;">Creative Brief Agent</label>
+                <select id="briefAgentSelect" style="background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 10px;font-size:13px;width:100%;">
+                    <option value="">⏳ Loading agents…</option>
+                </select>
+            </div>
+            <div class="form-row" style="margin-bottom:0;">
+                <label style="font-size:12px;color:#94a3b8;font-weight:600;display:block;margin-bottom:5px;">JSON Generator Agent</label>
+                <select id="jsonAgentSelect" style="background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 10px;font-size:13px;width:100%;">
+                    <option value="">⏳ Loading agents…</option>
+                </select>
+            </div>
         </div>
         <button class="btn btn-purple" onclick="runStage2()" id="stage2Btn" disabled><i class="fas fa-rocket"></i> Convert Selected Ideas</button>
         <div id="stage2Progress" style="display:none;margin-top:12px;">
@@ -391,7 +399,8 @@
             document.getElementById('stage2Label').textContent = 'AI is building templates…';
             const stageModel = document.getElementById('stageModel').value;
             const briefAgentId = document.getElementById('briefAgentSelect').value || null;
-            const data = await api('POST', '/api/template/stage2', { idea_ids: ids, model: stageModel, brief_agent_id: briefAgentId });
+            const jsonAgentId  = document.getElementById('jsonAgentSelect').value || null;
+            const data = await api('POST', '/api/template/stage2', { idea_ids: ids, model: stageModel, brief_agent_id: briefAgentId, json_agent_id: jsonAgentId });
             document.getElementById('stage2Fill').style.width = '100%';
             document.getElementById('stage2Label').textContent = 'Done';
             const errs = data.errors || [];
@@ -600,15 +609,27 @@
             const agents = data.agents || [];
             const sel = document.getElementById('briefAgentSelect');
             if (!agents.length) {
-                sel.innerHTML = '<option value="">No brief agents found</option>';
+                sel.innerHTML = '<option value="">No agents found</option>';
                 return;
             }
-            sel.innerHTML = agents.map(a =>
-                `<option value="${escHtml(a.id)}">${escHtml(a.display_name)}</option>`
-            ).join('');
+            sel.innerHTML = '<option value="">None (skip brief pass)</option>' +
+                agents.map(a => `<option value="${escHtml(a.id)}">${escHtml(a.display_name)}</option>`).join('');
         } catch (e) {
             document.getElementById('briefAgentSelect').innerHTML = '<option value="">Failed to load agents</option>';
             log(`Brief agents load failed: ${e.message}`, 'warn');
+        }
+    }
+
+    async function loadJsonAgents() {
+        try {
+            const data = await api('GET', '/api/admin/agents');
+            const agents = (data.agents || []).filter(a => a.stage_use === 'json');
+            const sel = document.getElementById('jsonAgentSelect');
+            sel.innerHTML = '<option value="">None (use hardcoded fallback)</option>' +
+                agents.map(a => `<option value="${escHtml(a.id)}">${escHtml(a.display_name)}</option>`).join('');
+        } catch (e) {
+            document.getElementById('jsonAgentSelect').innerHTML = '<option value="">Failed to load agents</option>';
+            log(`JSON agents load failed: ${e.message}`, 'warn');
         }
     }
 
@@ -621,7 +642,7 @@
             await sb.auth.signOut();
             window.location.href = '/';
         });
-        await Promise.all([loadIdeas(), loadTemplates(), loadBriefAgents()]);
+        await Promise.all([loadIdeas(), loadTemplates(), loadBriefAgents(), loadJsonAgents()]);
     };
 </script>
 </body>
