@@ -597,7 +597,7 @@
     async function loadBriefAgents() {
         try {
             const data = await api('GET', '/api/admin/agents');
-            const agents = (data.agents || []).filter(a => a.json_agent_id);
+            const agents = data.agents || [];
             const sel = document.getElementById('briefAgentSelect');
             if (!agents.length) {
                 sel.innerHTML = '<option value="">No brief agents found</option>';
