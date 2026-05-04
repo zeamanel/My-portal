@@ -280,10 +280,10 @@ async def stage2_convert_ideas(request: Request, user=Depends(get_current_user))
     _hardcoded_p2 = (
         "You are an AI prompt engineer. Return ONLY a valid JSON object (no markdown, no explanation) with these keys: "
         "title (string), description (string), prompt_template (string with {{placeholders}}), "
-        "intent_type (string, e.g. 'marketing', 'educational', 'artistic'), "
-        "target_user (string, e.g. 'photographer', 'marketer'), "
         "fields (array of objects with: field_name, field_label, field_type, placeholder, is_required, options, "
         "variable_key (snake_case string matching the {{placeholder}}), variable_values (array of 2-3 example strings)). "
+        "Valid field_type values: 'text', 'textarea', 'select', 'number', 'color', 'file'. "
+        "Use 'file' for image/reference photo upload fields (e.g. product_image, garment_image). "
         "For fields with field_type 'select', include an 'options' array (list of strings) with 4-6 plausible choices. "
         "For all other field types, set options to []."
     )
