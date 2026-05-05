@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,640 +8,1029 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
-        .navbar { background: #1e293b; padding: 14px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; }
-        .navbar strong { color: #38bdf8; font-size: 16px; }
-        .navbar a { color: #94a3b8; text-decoration: none; margin-left: 20px; font-size: 13px; font-weight: 600; }
-        .navbar a:hover { color: #38bdf8; }
-        .container { max-width: 1400px; margin: 24px auto; padding: 0 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .full-width { grid-column: 1 / -1; }
-        .card { background: #1e293b; border-radius: 16px; padding: 24px; border: 1px solid #334155; }
-        .card h2 { font-size: 16px; font-weight: 700; color: #e2e8f0; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-        .card h2 i { color: #38bdf8; }
-        .btn { padding: 8px 16px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; transition: opacity 0.2s; }
-        .btn:hover { opacity: 0.85; }
-        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn-primary { background: #38bdf8; color: #0f172a; }
-        .btn-success { background: #10b981; color: white; }
-        .btn-purple { background: #8b5cf6; color: white; }
-        .btn-orange { background: #f97316; color: white; }
-        .btn-outline { background: transparent; border: 1px solid #475569; color: #94a3b8; }
-        .btn-danger { background: #ef4444; color: white; }
-        .btn-sm { padding: 5px 10px; font-size: 12px; }
-        input, select, textarea { background: #0f172a; border: 1px solid #334155; padding: 8px 12px; border-radius: 8px; color: #e2e8f0; font-size: 13px; width: 100%; }
-        input:focus, select:focus, textarea:focus { outline: none; border-color: #38bdf8; }
-        label { font-size: 12px; color: #94a3b8; font-weight: 600; display: block; margin-bottom: 4px; }
-        .form-row { margin-bottom: 12px; }
-        .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: #1e293b;
+            padding: 14px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #334155;
+        }
+
+        .navbar strong {
+            color: #38bdf8;
+            font-size: 16px;
+        }
+
+        .navbar a {
+            color: #94a3b8;
+            text-decoration: none;
+            margin-left: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .navbar a:hover {
+            color: #38bdf8;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 24px auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .card {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid #334155;
+        }
+
+        .card h2 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #e2e8f0;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card h2 i {
+            color: #38bdf8;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: opacity 0.2s;
+        }
+
+        .btn:hover {
+            opacity: 0.85;
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: #38bdf8;
+            color: #0f172a;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-purple {
+            background: #8b5cf6;
+            color: white;
+        }
+
+        .btn-orange {
+            background: #f97316;
+            color: white;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid #475569;
+            color: #94a3b8;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        input,
+        select,
+        textarea {
+            background: #0f172a;
+            border: 1px solid #334155;
+            padding: 8px 12px;
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 13px;
+            width: 100%;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #38bdf8;
+        }
+
+        label {
+            font-size: 12px;
+            color: #94a3b8;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .form-row {
+            margin-bottom: 12px;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 16px;
+        }
 
         /* Ideas list */
-        .idea-list { display: flex; flex-direction: column; gap: 8px; max-height: 340px; overflow-y: auto; }
-        .idea-item { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 12px; display: flex; align-items: flex-start; gap: 10px; cursor: pointer; transition: border-color 0.2s; }
-        .idea-item:hover { border-color: #475569; }
-        .idea-item.selected { border-color: #38bdf8; background: #1e3a5f; }
-        .idea-item input[type=checkbox] { width: auto; margin-top: 3px; flex-shrink: 0; }
-        .idea-item .idea-body { flex: 1; }
-        .idea-item .idea-title { font-weight: 700; font-size: 13px; color: #e2e8f0; }
-        .idea-item .idea-desc { font-size: 12px; color: #94a3b8; margin-top: 3px; }
-        .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; }
-        .badge-raw { background: #334155; color: #94a3b8; }
-        .badge-processed { background: #064e3b; color: #34d399; }
-        .badge-published { background: #1e3a5f; color: #38bdf8; }
-        .badge-draft { background: #3b1f0e; color: #fb923c; }
+        .idea-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 340px;
+            overflow-y: auto;
+        }
+
+        .idea-item {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            padding: 12px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .idea-item:hover {
+            border-color: #475569;
+        }
+
+        .idea-item.selected {
+            border-color: #38bdf8;
+            background: #1e3a5f;
+        }
+
+        .idea-item input[type=checkbox] {
+            width: auto;
+            margin-top: 3px;
+            flex-shrink: 0;
+        }
+
+        .idea-item .idea-body {
+            flex: 1;
+        }
+
+        .idea-item .idea-title {
+            font-weight: 700;
+            font-size: 13px;
+            color: #e2e8f0;
+        }
+
+        .idea-item .idea-desc {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 3px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .badge-raw {
+            background: #334155;
+            color: #94a3b8;
+        }
+
+        .badge-processed {
+            background: #064e3b;
+            color: #34d399;
+        }
+
+        .badge-published {
+            background: #1e3a5f;
+            color: #38bdf8;
+        }
+
+        .badge-draft {
+            background: #3b1f0e;
+            color: #fb923c;
+        }
 
         /* Template selector */
-        .template-card { background: #0f172a; border: 2px solid #334155; border-radius: 12px; padding: 14px; cursor: pointer; transition: border-color 0.2s; }
-        .template-card:hover { border-color: #475569; }
-        .template-card.active { border-color: #38bdf8; }
-        .template-card .tc-title { font-weight: 700; font-size: 14px; }
-        .template-card .tc-meta { font-size: 11px; color: #64748b; margin-top: 4px; }
+        .template-card {
+            background: #0f172a;
+            border: 2px solid #334155;
+            border-radius: 12px;
+            padding: 14px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .template-card:hover {
+            border-color: #475569;
+        }
+
+        .template-card.active {
+            border-color: #38bdf8;
+        }
+
+        .template-card .tc-title {
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .template-card .tc-meta {
+            font-size: 11px;
+            color: #64748b;
+            margin-top: 4px;
+        }
 
         /* Fields form */
-        .fields-form { display: flex; flex-direction: column; gap: 10px; }
+        .fields-form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
 
         /* Preview images */
-        .preview-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
-        .preview-box { background: #0f172a; border: 1px solid #334155; border-radius: 10px; overflow: hidden; }
-        .preview-box .preview-label { padding: 8px 10px; font-size: 11px; font-weight: 700; color: #94a3b8; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
-        .preview-box img { width: 100%; height: 160px; object-fit: cover; display: block; background: #0f172a; }
-        .preview-box .preview-url { padding: 8px; }
+        .preview-pair {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .preview-box {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .preview-box .preview-label {
+            padding: 8px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #94a3b8;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .preview-box img {
+            width: 100%;
+            height: 160px;
+            object-fit: cover;
+            display: block;
+            background: #0f172a;
+        }
+
+        .preview-box .preview-url {
+            padding: 8px;
+        }
 
         /* Result area */
-        .result-box { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 14px; margin-top: 12px; font-size: 13px; color: #e2e8f0; white-space: pre-wrap; line-height: 1.6; min-height: 60px; }
+        .result-box {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            padding: 14px;
+            margin-top: 12px;
+            font-size: 13px;
+            color: #e2e8f0;
+            white-space: pre-wrap;
+            line-height: 1.6;
+            min-height: 60px;
+        }
 
         /* Replace bar */
-        .replace-bar { background: #1e3a5f; border: 1px solid #38bdf8; border-radius: 10px; padding: 12px 16px; margin-top: 12px; display: none; align-items: center; gap: 10px; flex-wrap: wrap; }
-        .replace-bar.visible { display: flex; }
-        .replace-bar span { font-size: 12px; color: #93c5fd; flex: 1; }
+        .replace-bar {
+            background: #1e3a5f;
+            border: 1px solid #38bdf8;
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-top: 12px;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .replace-bar.visible {
+            display: flex;
+        }
+
+        .replace-bar span {
+            font-size: 12px;
+            color: #93c5fd;
+            flex: 1;
+        }
 
         /* Log */
-        .log-box { background: #0a0f1e; color: #67e8f9; font-family: monospace; padding: 14px; border-radius: 10px; height: 180px; overflow-y: auto; font-size: 12px; }
-        .log-box .le { margin-bottom: 2px; }
+        .log-box {
+            background: #0a0f1e;
+            color: #67e8f9;
+            font-family: monospace;
+            padding: 14px;
+            border-radius: 10px;
+            height: 180px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+
+        .log-box .le {
+            margin-bottom: 2px;
+        }
 
         /* Template grid */
-        .tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; max-height: 300px; overflow-y: auto; margin-bottom: 16px; }
+        .tpl-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 16px;
+        }
 
         /* Progress */
-        .progress-wrap { background: #334155; border-radius: 999px; overflow: hidden; height: 6px; margin-top: 8px; }
-        .progress-fill { background: linear-gradient(90deg, #38bdf8, #10b981); height: 100%; transition: width 0.3s; }
+        .progress-wrap {
+            background: #334155;
+            border-radius: 999px;
+            overflow: hidden;
+            height: 6px;
+            margin-top: 8px;
+        }
 
-        @media (max-width: 900px) { .container { grid-template-columns: 1fr; } .full-width { grid-column: 1; } }
+        .progress-fill {
+            background: linear-gradient(90deg, #38bdf8, #10b981);
+            height: 100%;
+            transition: width 0.3s;
+        }
+
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .full-width {
+                grid-column: 1;
+            }
+        }
     </style>
 </head>
+
 <body>
 
-<div class="navbar">
-    <strong>🔷 Template Factory</strong>
-    <div>
-        <a href="/ocr">OCR</a>
-        <a href="/context-builder">Context Builder</a>
-        <a href="/gallery">Gallery</a>
-        <a href="/admin/agents">Agents</a>
-        <a href="/" id="logoutBtn">Logout</a>
-    </div>
-</div>
-
-<div class="container">
-
-    <!-- ===== STAGE 1: Generate Ideas ===== -->
-    <div class="card">
-        <h2><i class="fas fa-lightbulb"></i> Stage 1 — Generate Ideas</h2>
-        <p style="font-size:13px;color:#64748b;margin-bottom:14px;">Ask AI to produce fresh template ideas and save them to <code>template_idea</code>.</p>
-        <div class="toolbar" style="flex-wrap:wrap;gap:8px;">
-            <select id="stageModel" style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 10px;font-size:13px;">
-                <optgroup label="── OpenRouter ──">
-                    <option value="openai/gpt-4o" selected>⭐ GPT-4o</option>
-                    <option value="deepseek/deepseek-chat">DeepSeek V3</option>
-                </optgroup>
-                <optgroup label="── Gemini Direct ──">
-                    <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite</option>
-                    <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
-                </optgroup>
-            </select>
-            <button class="btn btn-primary" onclick="runStage1()" id="stage1Btn"><i class="fas fa-magic"></i> Generate 5 Ideas</button>
-            <button class="btn btn-outline btn-sm" onclick="loadIdeas()"><i class="fas fa-sync"></i> Refresh</button>
-            <span id="ideasCount" style="font-size:12px;color:#64748b;"></span>
-        </div>
-        <div id="ideasList" class="idea-list">
-            <div style="color:#64748b;font-size:13px;text-align:center;padding:20px;">Click Refresh to load ideas</div>
-        </div>
-        <div style="margin-top:12px;display:flex;gap:8px;">
-            <button class="btn btn-success btn-sm" onclick="selectAllIdeas()">Select All Raw</button>
-            <button class="btn btn-outline btn-sm" onclick="deselectAllIdeas()">Deselect</button>
-            <span id="selectedIdeasCount" style="font-size:12px;color:#94a3b8;align-self:center;">0 selected</span>
+    <div class="navbar">
+        <strong>🔷 Template Factory</strong>
+        <div>
+            <a href="/ocr">OCR</a>
+            <a href="/context-builder">Context Builder</a>
+            <a href="/gallery">Gallery</a>
+            <a href="/admin/agents">Agents</a>
+            <a href="/" id="logoutBtn">Logout</a>
         </div>
     </div>
 
-    <!-- ===== STAGE 2: Convert to Templates ===== -->
-    <div class="card">
-        <h2><i class="fas fa-cogs"></i> Stage 2 — Convert to Templates</h2>
-        <p style="font-size:13px;color:#64748b;margin-bottom:14px;">Select raw ideas from Stage 1 and convert them into full <code>creator_templates</code> with fields.</p>
-        <div class="form-row" style="margin-bottom:12px;">
-            <label style="font-size:12px;color:#94a3b8;font-weight:600;display:block;margin-bottom:5px;">Creative Brief Agent</label>
-            <select id="briefAgentSelect" style="background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 10px;font-size:13px;width:100%;">
-                <option value="">⏳ Loading agents…</option>
-            </select>
-        </div>
-        <button class="btn btn-purple" onclick="runStage2()" id="stage2Btn" disabled><i class="fas fa-rocket"></i> Convert Selected Ideas</button>
-        <div id="stage2Progress" style="display:none;margin-top:12px;">
-            <div style="font-size:12px;color:#94a3b8;" id="stage2Label">Converting…</div>
-            <div class="progress-wrap"><div class="progress-fill" id="stage2Fill" style="width:0%"></div></div>
-        </div>
-        <div id="stage2Result" style="margin-top:14px;font-size:13px;"></div>
-    </div>
+    <div class="container">
 
-    <!-- ===== TEST TEMPLATE ===== -->
-    <div class="card full-width">
-        <h2><i class="fas fa-flask"></i> Test Template &amp; Replace Preview Images</h2>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-
-            <!-- Left: Select + Fields -->
-            <div>
-                <div class="form-row">
-                    <label>Select Template</label>
-                    <div class="toolbar" style="margin-bottom:8px;">
-                        <button class="btn btn-outline btn-sm" onclick="loadTemplates()"><i class="fas fa-sync"></i> Load Templates</button>
-                        <select id="publishFilter" onchange="loadTemplates()" style="width:auto;">
-                            <option value="">All</option>
-                            <option value="false">Drafts only</option>
-                            <option value="true">Published only</option>
-                        </select>
-                    </div>
-                    <div class="tpl-grid" id="templateGrid">
-                        <div style="color:#64748b;font-size:13px;">Click Load Templates</div>
-                    </div>
+        <!-- ===== STAGE 1: Generate Ideas ===== -->
+        <div class="card">
+            <h2><i class="fas fa-lightbulb"></i> Stage 1 — Generate Ideas</h2>
+            <p style="font-size:13px;color:#64748b;margin-bottom:14px;">Ask AI to produce fresh template ideas and save
+                them to <code>template_idea</code>.</p>
+            <div class="toolbar" style="flex-wrap:wrap;gap:8px;">
+                <select id="stageModel"
+                    style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 10px;font-size:13px;">
+                    <optgroup label="── OpenRouter ──">
+                        <option value="openai/gpt-4o" selected>⭐ GPT-4o</option>
+                        <option value="deepseek/deepseek-chat">DeepSeek V3</option>
+                        <option value="anthropic/claude-sonnet-4">🧠 Claude 4 Sonnet</option>
+                    </optgroup>
+                    <optgroup label="── Gemini Direct ──">
+                        <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite</option>
+                        <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
+                    </optgroup>
+                </select>
+                <button class="btn btn-primary" onclick="runStage1()" id="stage1Btn"><i class="fas fa-magic"></i>
+                    Generate 5 Ideas</button>
+                <button class="btn btn-outline btn-sm" onclick="loadIdeas()"><i class="fas fa-sync"></i>
+                    Refresh</button>
+                <span id="ideasCount" style="font-size:12px;color:#64748b;"></span>
+            </div>
+            <div id="ideasList" class="idea-list">
+                <div style="color:#64748b;font-size:13px;text-align:center;padding:20px;">Click Refresh to load ideas
                 </div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px;">
+                <button class="btn btn-success btn-sm" onclick="selectAllIdeas()">Select All Raw</button>
+                <button class="btn btn-outline btn-sm" onclick="deselectAllIdeas()">Deselect</button>
+                <span id="selectedIdeasCount" style="font-size:12px;color:#94a3b8;align-self:center;">0 selected</span>
+            </div>
+        </div>
 
-                <div id="fieldsSection" style="display:none;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                        <strong id="selectedTplTitle" style="font-size:14px;"></strong>
-                        <div style="display:flex;gap:6px;">
-                            <span id="publishBadge" class="badge"></span>
-                            <button class="btn btn-sm btn-outline" id="togglePublishBtn" onclick="togglePublish()"></button>
-                        </div>
-                    </div>
-                    <p id="selectedTplDesc" style="font-size:12px;color:#64748b;margin-bottom:12px;"></p>
+        <!-- ===== STAGE 2: Convert to Templates ===== -->
+        <div class="card">
+            <h2><i class="fas fa-cogs"></i> Stage 2 — Convert to Templates</h2>
+            <p style="font-size:13px;color:#64748b;margin-bottom:14px;">Select raw ideas from Stage 1 and convert them
+                into full <code>creator_templates</code> with fields.</p>
+            <div class="form-row" style="margin-bottom:12px;">
+                <label style="font-size:12px;color:#94a3b8;font-weight:600;display:block;margin-bottom:5px;">Creative
+                    Brief Agent</label>
+                <select id="briefAgentSelect"
+                    style="background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 10px;font-size:13px;width:100%;">
+                    <option value="">⏳ Loading agents…</option>
+                </select>
+            </div>
+            <button class="btn btn-purple" onclick="runStage2()" id="stage2Btn" disabled><i class="fas fa-rocket"></i>
+                Convert Selected Ideas</button>
+            <div id="stage2Progress" style="display:none;margin-top:12px;">
+                <div style="font-size:12px;color:#94a3b8;" id="stage2Label">Converting…</div>
+                <div class="progress-wrap">
+                    <div class="progress-fill" id="stage2Fill" style="width:0%"></div>
+                </div>
+            </div>
+            <div id="stage2Result" style="margin-top:14px;font-size:13px;"></div>
+        </div>
 
+        <!-- ===== TEST TEMPLATE ===== -->
+        <div class="card full-width">
+            <h2><i class="fas fa-flask"></i> Test Template &amp; Replace Preview Images</h2>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+
+                <!-- Left: Select + Fields -->
+                <div>
                     <div class="form-row">
-                        <label>Model</label>
-                        <select id="testModel">
-                            <option value="">⏳ Loading models…</option>
-                        </select>
-                    </div>
-
-                    <div class="fields-form" id="dynamicFields"></div>
-
-                    <button class="btn btn-success" onclick="runTest()" id="testBtn" style="margin-top:14px;width:100%;">
-                        <i class="fas fa-play"></i> Generate Asset
-                    </button>
-                </div>
-            </div>
-
-            <!-- Right: Preview images + Result -->
-            <div>
-                <div id="previewSection" style="display:none;">
-                    <label style="margin-bottom:8px;">Preview Images</label>
-                    <div class="preview-pair">
-                        <div class="preview-box">
-                            <div class="preview-label">
-                                Before
-                                <button class="btn btn-sm btn-outline" onclick="savePreviewImage('before')"><i class="fas fa-save"></i> Save</button>
-                            </div>
-                            <img id="beforeThumb" src="" onerror="this.style.display='none'" style="display:none;">
-                            <div class="preview-url">
-                                <input type="text" id="beforeUrl" placeholder="before_image_url" oninput="updateThumb('before')">
-                            </div>
+                        <label>Select Template</label>
+                        <div class="toolbar" style="margin-bottom:8px;">
+                            <button class="btn btn-outline btn-sm" onclick="loadTemplates()"><i class="fas fa-sync"></i>
+                                Load Templates</button>
+                            <select id="publishFilter" onchange="loadTemplates()" style="width:auto;">
+                                <option value="">All</option>
+                                <option value="false">Drafts only</option>
+                                <option value="true">Published only</option>
+                            </select>
                         </div>
-                        <div class="preview-box">
-                            <div class="preview-label">
-                                After
-                                <button class="btn btn-sm btn-outline" onclick="savePreviewImage('after')"><i class="fas fa-save"></i> Save</button>
-                            </div>
-                            <img id="afterThumb" src="" onerror="this.style.display='none'" style="display:none;">
-                            <div class="preview-url">
-                                <input type="text" id="afterUrl" placeholder="after_image_url" oninput="updateThumb('after')">
-                            </div>
+                        <div class="tpl-grid" id="templateGrid">
+                            <div style="color:#64748b;font-size:13px;">Click Load Templates</div>
                         </div>
                     </div>
+
+                    <div id="fieldsSection" style="display:none;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                            <strong id="selectedTplTitle" style="font-size:14px;"></strong>
+                            <div style="display:flex;gap:6px;">
+                                <span id="publishBadge" class="badge"></span>
+                                <button class="btn btn-sm btn-outline" id="togglePublishBtn"
+                                    onclick="togglePublish()"></button>
+                            </div>
+                        </div>
+                        <p id="selectedTplDesc" style="font-size:12px;color:#64748b;margin-bottom:12px;"></p>
+
+                        <div class="form-row">
+                            <label>Model</label>
+                            <select id="testModel">
+                                <option value="">⏳ Loading models…</option>
+                            </select>
+                        </div>
+
+                        <div class="fields-form" id="dynamicFields"></div>
+
+                        <button class="btn btn-success" onclick="runTest()" id="testBtn"
+                            style="margin-top:14px;width:100%;">
+                            <i class="fas fa-play"></i> Generate Asset
+                        </button>
+                    </div>
                 </div>
 
-                <div id="resultSection" style="display:none;margin-top:16px;">
-                    <label>Final Prompt (built from fields)</label>
-                    <div class="result-box" id="finalPromptBox"></div>
-                    <label style="margin-top:10px;">Refined Prompt (AI enhanced)</label>
-                    <div class="result-box" id="refinedPromptBox"></div>
+                <!-- Right: Preview images + Result -->
+                <div>
+                    <div id="previewSection" style="display:none;">
+                        <label style="margin-bottom:8px;">Preview Images</label>
+                        <div class="preview-pair">
+                            <div class="preview-box">
+                                <div class="preview-label">
+                                    Before
+                                    <button class="btn btn-sm btn-outline" onclick="savePreviewImage('before')"><i
+                                            class="fas fa-save"></i> Save</button>
+                                </div>
+                                <img id="beforeThumb" src="" onerror="this.style.display='none'" style="display:none;">
+                                <div class="preview-url">
+                                    <input type="text" id="beforeUrl" placeholder="before_image_url"
+                                        oninput="updateThumb('before')">
+                                </div>
+                            </div>
+                            <div class="preview-box">
+                                <div class="preview-label">
+                                    After
+                                    <button class="btn btn-sm btn-outline" onclick="savePreviewImage('after')"><i
+                                            class="fas fa-save"></i> Save</button>
+                                </div>
+                                <img id="afterThumb" src="" onerror="this.style.display='none'" style="display:none;">
+                                <div class="preview-url">
+                                    <input type="text" id="afterUrl" placeholder="after_image_url"
+                                        oninput="updateThumb('after')">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                    <div class="replace-bar" id="replaceBar">
-                        <span><i class="fas fa-exchange-alt"></i> Use this result as a preview image URL:</span>
-                        <button class="btn btn-sm btn-orange" onclick="useResultAsPreview('before')"><i class="fas fa-arrow-left"></i> Set as Before</button>
-                        <button class="btn btn-sm btn-success" onclick="useResultAsPreview('after')"><i class="fas fa-arrow-right"></i> Set as After</button>
+                    <div id="resultSection" style="display:none;margin-top:16px;">
+                        <label>Final Prompt (built from fields)</label>
+                        <div class="result-box" id="finalPromptBox"></div>
+                        <label style="margin-top:10px;">Refined Prompt (AI enhanced)</label>
+                        <div class="result-box" id="refinedPromptBox"></div>
+
+                        <div class="replace-bar" id="replaceBar">
+                            <span><i class="fas fa-exchange-alt"></i> Use this result as a preview image URL:</span>
+                            <button class="btn btn-sm btn-orange" onclick="useResultAsPreview('before')"><i
+                                    class="fas fa-arrow-left"></i> Set as Before</button>
+                            <button class="btn btn-sm btn-success" onclick="useResultAsPreview('after')"><i
+                                    class="fas fa-arrow-right"></i> Set as After</button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- ===== LOGS ===== -->
-    <div class="card full-width">
-        <h2><i class="fas fa-terminal"></i> Activity Log</h2>
-        <div class="log-box" id="logBox"></div>
-        <button class="btn btn-outline btn-sm" onclick="clearLog()" style="margin-top:8px;">Clear</button>
-    </div>
+        <!-- ===== LOGS ===== -->
+        <div class="card full-width">
+            <h2><i class="fas fa-terminal"></i> Activity Log</h2>
+            <div class="log-box" id="logBox"></div>
+            <button class="btn btn-outline btn-sm" onclick="clearLog()" style="margin-top:8px;">Clear</button>
+        </div>
 
-</div><!-- /container -->
+    </div><!-- /container -->
 
-<script>
-    const SUPABASE_URL = "https://vjcumvumnnvgncnbbtzk.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqY3VtdnVtbm52Z25jbmJidHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5MjQwOTMsImV4cCI6MjA4MzUwMDA5M30.6YtPHl9EXnRNDtdUIMkNbLLyUvuk9hG3k1gHjn14qd4";
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    <script>
+        const SUPABASE_URL = "https://vjcumvumnnvgncnbbtzk.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqY3VtdnVtbm52Z25jbmJidHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5MjQwOTMsImV4cCI6MjA4MzUwMDA5M30.6YtPHl9EXnRNDtdUIMkNbLLyUvuk9hG3k1gHjn14qd4";
+        const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    let selectedIdeaIds = new Set();
-    let selectedTemplateId = null;
-    let lastRefinedPrompt = null;
+        let selectedIdeaIds = new Set();
+        let selectedTemplateId = null;
+        let lastRefinedPrompt = null;
 
-    // ── Auth ──────────────────────────────────────────────
-    async function getToken() {
-        const { data: { session } } = await sb.auth.getSession();
-        if (!session) { window.location.href = '/'; throw new Error('Not authenticated'); }
-        return session.access_token;
-    }
+        // ── Auth ──────────────────────────────────────────────
+        async function getToken() {
+            const { data: { session } } = await sb.auth.getSession();
+            if (!session) { window.location.href = '/'; throw new Error('Not authenticated'); }
+            return session.access_token;
+        }
 
-    async function api(method, path, body) {
-        const token = await getToken();
-        const opts = { method, headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } };
-        if (body) opts.body = JSON.stringify(body);
-        const res = await fetch(path, opts);
-        if (!res.ok) { const t = await res.text(); throw new Error(t); }
-        return res.json();
-    }
+        async function api(method, path, body) {
+            const token = await getToken();
+            const opts = { method, headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } };
+            if (body) opts.body = JSON.stringify(body);
+            const res = await fetch(path, opts);
+            if (!res.ok) { const t = await res.text(); throw new Error(t); }
+            return res.json();
+        }
 
-    // ── Log ───────────────────────────────────────────────
-    function log(msg, type = 'info') {
-        const box = document.getElementById('logBox');
-        const colors = { info: '#67e8f9', success: '#4ade80', error: '#f87171', warn: '#fbbf24' };
-        const time = new Date().toLocaleTimeString();
-        box.innerHTML += `<div class="le"><span style="color:#475569">[${time}]</span> <span style="color:${colors[type] || colors.info}">${escHtml(msg)}</span></div>`;
-        box.scrollTop = box.scrollHeight;
-    }
-    function clearLog() { document.getElementById('logBox').innerHTML = ''; }
+        // ── Log ───────────────────────────────────────────────
+        function log(msg, type = 'info') {
+            const box = document.getElementById('logBox');
+            const colors = { info: '#67e8f9', success: '#4ade80', error: '#f87171', warn: '#fbbf24' };
+            const time = new Date().toLocaleTimeString();
+            box.innerHTML += `<div class="le"><span style="color:#475569">[${time}]</span> <span style="color:${colors[type] || colors.info}">${escHtml(msg)}</span></div>`;
+            box.scrollTop = box.scrollHeight;
+        }
+        function clearLog() { document.getElementById('logBox').innerHTML = ''; }
 
-    function escHtml(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+        function escHtml(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
-    // ── Stage 1 ───────────────────────────────────────────
-    async function runStage1() {
-        const btn = document.getElementById('stage1Btn');
-        btn.disabled = true;
-        const stageModel = document.getElementById('stageModel').value;
-        log(`Calling Stage 1 — generating ideas… (${stageModel})`);
-        try {
-            const data = await api('POST', '/api/template/stage1', { model: stageModel });
-            log(`Stage 1 complete: ${data.count} ideas saved`, 'success');
-            await loadIdeas();
-        } catch (e) { log(`Stage 1 failed: ${e.message}`, 'error'); }
-        finally { btn.disabled = false; }
-    }
+        // ── Stage 1 ───────────────────────────────────────────
+        async function runStage1() {
+            const btn = document.getElementById('stage1Btn');
+            btn.disabled = true;
+            const stageModel = document.getElementById('stageModel').value;
+            log(`Calling Stage 1 — generating ideas… (${stageModel})`);
+            try {
+                const data = await api('POST', '/api/template/stage1', { model: stageModel });
+                log(`Stage 1 complete: ${data.count} ideas saved`, 'success');
+                await loadIdeas();
+            } catch (e) { log(`Stage 1 failed: ${e.message}`, 'error'); }
+            finally { btn.disabled = false; }
+        }
 
-    async function loadIdeas() {
-        log('Loading ideas…');
-        try {
-            const data = await api('GET', '/api/template/ideas');
-            renderIdeas(data.ideas || []);
-        } catch (e) { log(`Load ideas failed: ${e.message}`, 'error'); }
-    }
+        async function loadIdeas() {
+            log('Loading ideas…');
+            try {
+                const data = await api('GET', '/api/template/ideas');
+                renderIdeas(data.ideas || []);
+            } catch (e) { log(`Load ideas failed: ${e.message}`, 'error'); }
+        }
 
-    function renderIdeas(ideas) {
-        const list = document.getElementById('ideasList');
-        document.getElementById('ideasCount').textContent = `${ideas.length} ideas`;
-        if (!ideas.length) { list.innerHTML = '<div style="color:#64748b;font-size:13px;text-align:center;padding:20px;">No ideas yet — click Generate</div>'; return; }
-        list.innerHTML = '';
-        ideas.forEach(idea => {
-            const isSelected = selectedIdeaIds.has(idea.id);
-            const div = document.createElement('div');
-            div.className = `idea-item${isSelected ? ' selected' : ''}`;
-            div.dataset.id = idea.id;
-            div.dataset.stage = idea.stage;
-            div.innerHTML = `
+        function renderIdeas(ideas) {
+            const list = document.getElementById('ideasList');
+            document.getElementById('ideasCount').textContent = `${ideas.length} ideas`;
+            if (!ideas.length) { list.innerHTML = '<div style="color:#64748b;font-size:13px;text-align:center;padding:20px;">No ideas yet — click Generate</div>'; return; }
+            list.innerHTML = '';
+            ideas.forEach(idea => {
+                const isSelected = selectedIdeaIds.has(idea.id);
+                const div = document.createElement('div');
+                div.className = `idea-item${isSelected ? ' selected' : ''}`;
+                div.dataset.id = idea.id;
+                div.dataset.stage = idea.stage;
+                div.innerHTML = `
                 <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleIdea('${idea.id}', this.checked)">
                 <div class="idea-body">
                     <div class="idea-title">${escHtml(idea.title || 'Untitled')}</div>
-                    <div class="idea-desc">${escHtml((idea.description || '').substring(0, 100))}${(idea.description||'').length > 100 ? '…' : ''}</div>
+                    <div class="idea-desc">${escHtml((idea.description || '').substring(0, 100))}${(idea.description || '').length > 100 ? '…' : ''}</div>
                     <div style="margin-top:4px;">
                         <span class="badge badge-${idea.stage === 'processed' ? 'processed' : 'raw'}">${idea.stage || 'raw'}</span>
                         <span style="font-size:11px;color:#475569;margin-left:6px;">${idea.media_type || 'Image'}</span>
                     </div>
                 </div>`;
-            list.appendChild(div);
-        });
-        updateIdeaUI();
-    }
+                list.appendChild(div);
+            });
+            updateIdeaUI();
+        }
 
-    function toggleIdea(id, checked) {
-        if (checked) selectedIdeaIds.add(id);
-        else selectedIdeaIds.delete(id);
-        document.querySelectorAll(`.idea-item[data-id="${id}"]`).forEach(el => el.classList.toggle('selected', checked));
-        updateIdeaUI();
-    }
+        function toggleIdea(id, checked) {
+            if (checked) selectedIdeaIds.add(id);
+            else selectedIdeaIds.delete(id);
+            document.querySelectorAll(`.idea-item[data-id="${id}"]`).forEach(el => el.classList.toggle('selected', checked));
+            updateIdeaUI();
+        }
 
-    function selectAllIdeas() {
-        document.querySelectorAll('.idea-item[data-stage="raw"]').forEach(el => {
-            const id = el.dataset.id;
-            selectedIdeaIds.add(id);
-            el.classList.add('selected');
-            el.querySelector('input[type=checkbox]').checked = true;
-        });
-        updateIdeaUI();
-    }
+        function selectAllIdeas() {
+            document.querySelectorAll('.idea-item[data-stage="raw"]').forEach(el => {
+                const id = el.dataset.id;
+                selectedIdeaIds.add(id);
+                el.classList.add('selected');
+                el.querySelector('input[type=checkbox]').checked = true;
+            });
+            updateIdeaUI();
+        }
 
-    function deselectAllIdeas() {
-        selectedIdeaIds.clear();
-        document.querySelectorAll('.idea-item').forEach(el => {
-            el.classList.remove('selected');
-            el.querySelector('input[type=checkbox]').checked = false;
-        });
-        updateIdeaUI();
-    }
-
-    function updateIdeaUI() {
-        const count = selectedIdeaIds.size;
-        document.getElementById('selectedIdeasCount').textContent = `${count} selected`;
-        document.getElementById('stage2Btn').disabled = count === 0;
-    }
-
-    // ── Stage 2 ───────────────────────────────────────────
-    async function runStage2() {
-        const btn = document.getElementById('stage2Btn');
-        const ids = Array.from(selectedIdeaIds);
-        btn.disabled = true;
-        document.getElementById('stage2Progress').style.display = 'block';
-        document.getElementById('stage2Result').innerHTML = '';
-        log(`Converting ${ids.length} ideas to templates…`);
-        try {
-            document.getElementById('stage2Fill').style.width = '30%';
-            document.getElementById('stage2Label').textContent = 'AI is building templates…';
-            const stageModel = document.getElementById('stageModel').value;
-            const briefAgentId = document.getElementById('briefAgentSelect').value || null;
-            const data = await api('POST', '/api/template/stage2', { idea_ids: ids, model: stageModel, brief_agent_id: briefAgentId });
-            document.getElementById('stage2Fill').style.width = '100%';
-            document.getElementById('stage2Label').textContent = 'Done';
-            const errs = data.errors || [];
-            const color = data.created > 0 ? '#4ade80' : '#fbbf24';
-            const icon  = data.created > 0 ? 'fa-check-circle' : 'fa-exclamation-triangle';
-            document.getElementById('stage2Result').innerHTML =
-                `<span style="color:${color};font-size:13px;"><i class="fas ${icon}"></i> Created ${data.created} template(s)${errs.length ? `, ${errs.length} failed` : ''}</span>`;
-            log(`Stage 2 complete: ${data.created} created, ${errs.length} errors`, data.created > 0 ? 'success' : 'warn');
-            errs.forEach(e => log(`  ✗ idea ${e.idea_id}: ${e.error}`, 'error'));
+        function deselectAllIdeas() {
             selectedIdeaIds.clear();
-            await loadIdeas();
-        } catch (e) {
-            log(`Stage 2 failed: ${e.message}`, 'error');
-            document.getElementById('stage2Result').innerHTML = `<span style="color:#f87171;font-size:13px;">Error: ${escHtml(e.message)}</span>`;
-        } finally {
-            btn.disabled = false;
-            setTimeout(() => { document.getElementById('stage2Progress').style.display = 'none'; }, 2000);
+            document.querySelectorAll('.idea-item').forEach(el => {
+                el.classList.remove('selected');
+                el.querySelector('input[type=checkbox]').checked = false;
+            });
+            updateIdeaUI();
         }
-    }
 
-    // ── Load Templates ────────────────────────────────────
-    async function loadTemplates() {
-        const filter = document.getElementById('publishFilter').value;
-        let url = '/api/templates';
-        if (filter !== '') url += `?published=${filter}`;
-        log('Loading templates…');
-        try {
-            const data = await api('GET', url);
-            renderTemplateGrid(data.templates || []);
-        } catch (e) { log(`Load templates failed: ${e.message}`, 'error'); }
-    }
-
-    function renderTemplateGrid(templates) {
-        const grid = document.getElementById('templateGrid');
-        if (!templates.length) {
-            grid.innerHTML = '<div style="color:#64748b;font-size:13px;">No templates found</div>';
-            return;
+        function updateIdeaUI() {
+            const count = selectedIdeaIds.size;
+            document.getElementById('selectedIdeasCount').textContent = `${count} selected`;
+            document.getElementById('stage2Btn').disabled = count === 0;
         }
-        grid.innerHTML = '';
-        templates.forEach(tpl => {
-            const card = document.createElement('div');
-            card.className = `template-card${selectedTemplateId === tpl.id ? ' active' : ''}`;
-            card.onclick = () => selectTemplate(tpl.id);
-            card.innerHTML = `
+
+        // ── Stage 2 ───────────────────────────────────────────
+        async function runStage2() {
+            const btn = document.getElementById('stage2Btn');
+            const ids = Array.from(selectedIdeaIds);
+            btn.disabled = true;
+            document.getElementById('stage2Progress').style.display = 'block';
+            document.getElementById('stage2Result').innerHTML = '';
+            log(`Converting ${ids.length} ideas to templates…`);
+            try {
+                document.getElementById('stage2Fill').style.width = '30%';
+                document.getElementById('stage2Label').textContent = 'AI is building templates…';
+                const stageModel = document.getElementById('stageModel').value;
+                const briefAgentId = document.getElementById('briefAgentSelect').value || null;
+                const data = await api('POST', '/api/template/stage2', { idea_ids: ids, model: stageModel, brief_agent_id: briefAgentId });
+                document.getElementById('stage2Fill').style.width = '100%';
+                document.getElementById('stage2Label').textContent = 'Done';
+                const errs = data.errors || [];
+                const color = data.created > 0 ? '#4ade80' : '#fbbf24';
+                const icon = data.created > 0 ? 'fa-check-circle' : 'fa-exclamation-triangle';
+                document.getElementById('stage2Result').innerHTML =
+                    `<span style="color:${color};font-size:13px;"><i class="fas ${icon}"></i> Created ${data.created} template(s)${errs.length ? `, ${errs.length} failed` : ''}</span>`;
+                log(`Stage 2 complete: ${data.created} created, ${errs.length} errors`, data.created > 0 ? 'success' : 'warn');
+                errs.forEach(e => log(`  ✗ idea ${e.idea_id}: ${e.error}`, 'error'));
+                selectedIdeaIds.clear();
+                await loadIdeas();
+            } catch (e) {
+                log(`Stage 2 failed: ${e.message}`, 'error');
+                document.getElementById('stage2Result').innerHTML = `<span style="color:#f87171;font-size:13px;">Error: ${escHtml(e.message)}</span>`;
+            } finally {
+                btn.disabled = false;
+                setTimeout(() => { document.getElementById('stage2Progress').style.display = 'none'; }, 2000);
+            }
+        }
+
+        // ── Load Templates ────────────────────────────────────
+        async function loadTemplates() {
+            const filter = document.getElementById('publishFilter').value;
+            let url = '/api/templates';
+            if (filter !== '') url += `?published=${filter}`;
+            log('Loading templates…');
+            try {
+                const data = await api('GET', url);
+                renderTemplateGrid(data.templates || []);
+            } catch (e) { log(`Load templates failed: ${e.message}`, 'error'); }
+        }
+
+        function renderTemplateGrid(templates) {
+            const grid = document.getElementById('templateGrid');
+            if (!templates.length) {
+                grid.innerHTML = '<div style="color:#64748b;font-size:13px;">No templates found</div>';
+                return;
+            }
+            grid.innerHTML = '';
+            templates.forEach(tpl => {
+                const card = document.createElement('div');
+                card.className = `template-card${selectedTemplateId === tpl.id ? ' active' : ''}`;
+                card.onclick = () => selectTemplate(tpl.id);
+                card.innerHTML = `
                 <div class="tc-title">${escHtml(tpl.title || 'Untitled')}</div>
                 <div class="tc-meta">
                     ${tpl.media_type || 'Image'} &nbsp;·&nbsp;
                     <span class="badge ${tpl.is_published ? 'badge-published' : 'badge-draft'}">${tpl.is_published ? 'Published' : 'Draft'}</span>
                 </div>`;
-            grid.appendChild(card);
-        });
-    }
-
-    async function selectTemplate(id) {
-        selectedTemplateId = id;
-        log(`Loading template ${id}…`);
-        try {
-            const data = await api('GET', `/api/templates/${id}`);
-            populateTemplate(data.template, data.fields || []);
-            renderTemplateGrid(Array.from(document.querySelectorAll('.template-card')).map(el => ({ id: el.dataset?.id })));
-            // Re-mark active
-            document.querySelectorAll('.template-card').forEach(el => el.classList.remove('active'));
-            // Re-render properly
-            loadTemplates();
-        } catch (e) { log(`Select template failed: ${e.message}`, 'error'); }
-    }
-
-    function populateTemplate(tpl, fields) {
-        document.getElementById('fieldsSection').style.display = 'block';
-        document.getElementById('previewSection').style.display = 'block';
-        document.getElementById('resultSection').style.display = 'none';
-
-        document.getElementById('selectedTplTitle').textContent = tpl.title || 'Untitled';
-        document.getElementById('selectedTplDesc').textContent = tpl.description || '';
-
-        const published = tpl.is_published;
-        const badge = document.getElementById('publishBadge');
-        badge.textContent = published ? 'Published' : 'Draft';
-        badge.className = `badge ${published ? 'badge-published' : 'badge-draft'}`;
-        const toggleBtn = document.getElementById('togglePublishBtn');
-        toggleBtn.textContent = published ? 'Unpublish' : 'Publish';
-        toggleBtn.className = `btn btn-sm ${published ? 'btn-danger' : 'btn-success'}`;
-
-        // Preview images
-        const beforeUrl = tpl.before_image_url || '';
-        const afterUrl = tpl.after_image_url || '';
-        document.getElementById('beforeUrl').value = beforeUrl;
-        document.getElementById('afterUrl').value = afterUrl;
-        updateThumb('before');
-        updateThumb('after');
-
-        // Dynamic fields
-        const form = document.getElementById('dynamicFields');
-        form.innerHTML = '';
-        if (!fields.length) {
-            form.innerHTML = '<p style="font-size:12px;color:#64748b;">No fields defined for this template.</p>';
-            return;
-        }
-        fields.forEach(f => {
-            const row = document.createElement('div');
-            row.className = 'form-row';
-            row.innerHTML = `<label>${escHtml(f.field_label || f.field_name)}${f.is_required ? ' *' : ''}</label>`;
-            let input;
-            if (f.field_type === 'textarea') {
-                input = document.createElement('textarea');
-                input.rows = 3;
-            } else if (f.field_type === 'select' && f.options) {
-                input = document.createElement('select');
-                (Array.isArray(f.options) ? f.options : []).forEach(opt => {
-                    const o = document.createElement('option');
-                    o.value = opt; o.textContent = opt;
-                    input.appendChild(o);
-                });
-            } else {
-                input = document.createElement('input');
-                input.type = f.field_type === 'number' ? 'number' : 'text';
-            }
-            input.id = `field_${f.field_name}`;
-            input.placeholder = f.placeholder || '';
-            row.appendChild(input);
-            form.appendChild(row);
-        });
-    }
-
-    function updateThumb(which) {
-        const url = document.getElementById(`${which}Url`).value.trim();
-        const img = document.getElementById(`${which}Thumb`);
-        if (url) { img.src = url; img.style.display = 'block'; }
-        else { img.style.display = 'none'; }
-    }
-
-    async function savePreviewImage(which) {
-        if (!selectedTemplateId) { log('No template selected', 'warn'); return; }
-        const url = document.getElementById(`${which}Url`).value.trim();
-        const key = which === 'before' ? 'before_image_url' : 'after_image_url';
-        try {
-            await api('PATCH', `/api/templates/${selectedTemplateId}`, { [key]: url || null });
-            log(`Saved ${which} image URL`, 'success');
-            updateThumb(which);
-        } catch (e) { log(`Save failed: ${e.message}`, 'error'); }
-    }
-
-    async function togglePublish() {
-        if (!selectedTemplateId) return;
-        const badge = document.getElementById('publishBadge');
-        const isCurrentlyPublished = badge.textContent === 'Published';
-        try {
-            await api('PATCH', `/api/templates/${selectedTemplateId}`, { is_published: !isCurrentlyPublished });
-            log(`Template ${!isCurrentlyPublished ? 'published' : 'unpublished'}`, 'success');
-            await loadTemplates();
-        } catch (e) { log(`Toggle publish failed: ${e.message}`, 'error'); }
-    }
-
-    // ── Generate Asset ─────────────────────────────────────
-    async function runTest() {
-        if (!selectedTemplateId) { log('No template selected', 'warn'); return; }
-        const btn = document.getElementById('testBtn');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating asset…';
-
-        const field_values = {};
-        document.querySelectorAll('#dynamicFields input, #dynamicFields select, #dynamicFields textarea').forEach(el => {
-            const name = el.id.replace('field_', '');
-            field_values[name] = el.value;
-        });
-
-        log(`Generating asset from template ${selectedTemplateId}…`);
-        try {
-            const data = await api('POST', '/api/template/generate', {
-                template_id: selectedTemplateId,
-                model_id: document.getElementById('testModel').value || undefined,
-                field_values
+                grid.appendChild(card);
             });
-            const outputUrl = data.output_url;
+        }
 
-            document.getElementById('afterUrl').value = outputUrl;
+        async function selectTemplate(id) {
+            selectedTemplateId = id;
+            log(`Loading template ${id}…`);
+            try {
+                const data = await api('GET', `/api/templates/${id}`);
+                populateTemplate(data.template, data.fields || []);
+                renderTemplateGrid(Array.from(document.querySelectorAll('.template-card')).map(el => ({ id: el.dataset?.id })));
+                // Re-mark active
+                document.querySelectorAll('.template-card').forEach(el => el.classList.remove('active'));
+                // Re-render properly
+                loadTemplates();
+            } catch (e) { log(`Select template failed: ${e.message}`, 'error'); }
+        }
+
+        function populateTemplate(tpl, fields) {
+            document.getElementById('fieldsSection').style.display = 'block';
+            document.getElementById('previewSection').style.display = 'block';
+            document.getElementById('resultSection').style.display = 'none';
+
+            document.getElementById('selectedTplTitle').textContent = tpl.title || 'Untitled';
+            document.getElementById('selectedTplDesc').textContent = tpl.description || '';
+
+            const published = tpl.is_published;
+            const badge = document.getElementById('publishBadge');
+            badge.textContent = published ? 'Published' : 'Draft';
+            badge.className = `badge ${published ? 'badge-published' : 'badge-draft'}`;
+            const toggleBtn = document.getElementById('togglePublishBtn');
+            toggleBtn.textContent = published ? 'Unpublish' : 'Publish';
+            toggleBtn.className = `btn btn-sm ${published ? 'btn-danger' : 'btn-success'}`;
+
+            // Preview images
+            const beforeUrl = tpl.before_image_url || '';
+            const afterUrl = tpl.after_image_url || '';
+            document.getElementById('beforeUrl').value = beforeUrl;
+            document.getElementById('afterUrl').value = afterUrl;
+            updateThumb('before');
             updateThumb('after');
 
-            document.getElementById('finalPromptBox').textContent = 'Generation completed. Preview updated.';
-            document.getElementById('refinedPromptBox').textContent = '';
-            document.getElementById('resultSection').style.display = 'block';
-            document.getElementById('replaceBar').classList.remove('visible');
-            log(`Asset generated: ${outputUrl}`, 'success');
-        } catch (e) {
-            log(`Generation failed: ${e.message}`, 'error');
-            document.getElementById('finalPromptBox').textContent = `Error: ${e.message}`;
-            document.getElementById('resultSection').style.display = 'block';
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-play"></i> Generate Asset';
-        }
-    }
-
-    function useResultAsPreview(which) {
-        if (!lastRefinedPrompt) return;
-        document.getElementById(`${which}Url`).value = lastRefinedPrompt;
-        updateThumb(which);
-        log(`Refined prompt copied to ${which} image URL field — click Save to persist`, 'info');
-    }
-
-    // ── Init ──────────────────────────────────────────────
-    // ── Test Model selector ───────────────────────────────
-    async function loadTestModels() {
-        try {
-            const data = await api('GET', '/api/admin/ai-models');
-            const models = data.models || [];
-            const sel = document.getElementById('testModel');
-            if (!models.length) {
-                sel.innerHTML = '<option value="">No models found</option>';
+            // Dynamic fields
+            const form = document.getElementById('dynamicFields');
+            form.innerHTML = '';
+            if (!fields.length) {
+                form.innerHTML = '<p style="font-size:12px;color:#64748b;">No fields defined for this template.</p>';
                 return;
             }
-            // Group by media_type
-            const groups = {};
-            models.forEach(m => {
-                const g = m.media_type || 'Other';
-                if (!groups[g]) groups[g] = [];
-                groups[g].push(m);
+            fields.forEach(f => {
+                const row = document.createElement('div');
+                row.className = 'form-row';
+                row.innerHTML = `<label>${escHtml(f.field_label || f.field_name)}${f.is_required ? ' *' : ''}</label>`;
+                let input;
+                if (f.field_type === 'textarea') {
+                    input = document.createElement('textarea');
+                    input.rows = 3;
+                } else if (f.field_type === 'select' && f.options) {
+                    input = document.createElement('select');
+                    (Array.isArray(f.options) ? f.options : []).forEach(opt => {
+                        const o = document.createElement('option');
+                        o.value = opt; o.textContent = opt;
+                        input.appendChild(o);
+                    });
+                } else {
+                    input = document.createElement('input');
+                    input.type = f.field_type === 'number' ? 'number' : 'text';
+                }
+                input.id = `field_${f.field_name}`;
+                input.placeholder = f.placeholder || '';
+                row.appendChild(input);
+                form.appendChild(row);
             });
-            sel.innerHTML = Object.entries(groups).map(([type, items]) =>
-                `<optgroup label="── ${escHtml(type)} ──">` +
-                items.map(m => `<option value="${escHtml(m.model_id)}">${escHtml(m.display_name)}</option>`).join('') +
-                `</optgroup>`
-            ).join('');
-        } catch (e) {
-            document.getElementById('testModel').innerHTML = '<option value="">Failed to load</option>';
-            log(`AI models load failed: ${e.message}`, 'warn');
         }
-    }
 
-    // ── Brief Agents ──────────────────────────────────────
-    async function loadBriefAgents() {
-        try {
-            const data = await api('GET', '/api/admin/agents');
-            const agents = (data.agents || []).filter(a => a.json_agent_id);
-            const sel = document.getElementById('briefAgentSelect');
-            if (!agents.length) {
-                sel.innerHTML = '<option value="">No brief agents found</option>';
-                return;
+        function updateThumb(which) {
+            const url = document.getElementById(`${which}Url`).value.trim();
+            const img = document.getElementById(`${which}Thumb`);
+            if (url) { img.src = url; img.style.display = 'block'; }
+            else { img.style.display = 'none'; }
+        }
+
+        async function savePreviewImage(which) {
+            if (!selectedTemplateId) { log('No template selected', 'warn'); return; }
+            const url = document.getElementById(`${which}Url`).value.trim();
+            const key = which === 'before' ? 'before_image_url' : 'after_image_url';
+            try {
+                await api('PATCH', `/api/templates/${selectedTemplateId}`, { [key]: url || null });
+                log(`Saved ${which} image URL`, 'success');
+                updateThumb(which);
+            } catch (e) { log(`Save failed: ${e.message}`, 'error'); }
+        }
+
+        async function togglePublish() {
+            if (!selectedTemplateId) return;
+            const badge = document.getElementById('publishBadge');
+            const isCurrentlyPublished = badge.textContent === 'Published';
+            try {
+                await api('PATCH', `/api/templates/${selectedTemplateId}`, { is_published: !isCurrentlyPublished });
+                log(`Template ${!isCurrentlyPublished ? 'published' : 'unpublished'}`, 'success');
+                await loadTemplates();
+            } catch (e) { log(`Toggle publish failed: ${e.message}`, 'error'); }
+        }
+
+        // ── Generate Asset ─────────────────────────────────────
+        async function runTest() {
+            if (!selectedTemplateId) { log('No template selected', 'warn'); return; }
+            const btn = document.getElementById('testBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating asset…';
+
+            const field_values = {};
+            document.querySelectorAll('#dynamicFields input, #dynamicFields select, #dynamicFields textarea').forEach(el => {
+                const name = el.id.replace('field_', '');
+                field_values[name] = el.value;
+            });
+
+            log(`Generating asset from template ${selectedTemplateId}…`);
+            try {
+                const data = await api('POST', '/api/template/generate', {
+                    template_id: selectedTemplateId,
+                    model_id: document.getElementById('testModel').value || undefined,
+                    field_values
+                });
+                const outputUrl = data.output_url;
+
+                document.getElementById('afterUrl').value = outputUrl;
+                updateThumb('after');
+
+                document.getElementById('finalPromptBox').textContent = 'Generation completed. Preview updated.';
+                document.getElementById('refinedPromptBox').textContent = '';
+                document.getElementById('resultSection').style.display = 'block';
+                document.getElementById('replaceBar').classList.remove('visible');
+                log(`Asset generated: ${outputUrl}`, 'success');
+            } catch (e) {
+                log(`Generation failed: ${e.message}`, 'error');
+                document.getElementById('finalPromptBox').textContent = `Error: ${e.message}`;
+                document.getElementById('resultSection').style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-play"></i> Generate Asset';
             }
-            sel.innerHTML = agents.map(a =>
-                `<option value="${escHtml(a.id)}">${escHtml(a.display_name)}</option>`
-            ).join('');
-        } catch (e) {
-            document.getElementById('briefAgentSelect').innerHTML = '<option value="">Failed to load agents</option>';
-            log(`Brief agents load failed: ${e.message}`, 'warn');
         }
-    }
 
-    window.onload = async () => {
-        const { data: { session } } = await sb.auth.getSession();
-        if (!session) { window.location.href = '/'; return; }
-        log('Authenticated — ready', 'success');
-        document.getElementById('logoutBtn').addEventListener('click', async e => {
-            e.preventDefault();
-            await sb.auth.signOut();
-            window.location.href = '/';
-        });
-        await Promise.all([loadIdeas(), loadTemplates(), loadBriefAgents(), loadTestModels()]);
-    };
-</script>
+        function useResultAsPreview(which) {
+            if (!lastRefinedPrompt) return;
+            document.getElementById(`${which}Url`).value = lastRefinedPrompt;
+            updateThumb(which);
+            log(`Refined prompt copied to ${which} image URL field — click Save to persist`, 'info');
+        }
+
+        // ── Init ──────────────────────────────────────────────
+        // ── Test Model selector ───────────────────────────────
+        async function loadTestModels() {
+            try {
+                const data = await api('GET', '/api/admin/ai-models');
+                const models = data.models || [];
+                const sel = document.getElementById('testModel');
+                if (!models.length) {
+                    sel.innerHTML = '<option value="">No models found</option>';
+                    return;
+                }
+                // Group by media_type
+                const groups = {};
+                models.forEach(m => {
+                    const g = m.media_type || 'Other';
+                    if (!groups[g]) groups[g] = [];
+                    groups[g].push(m);
+                });
+                sel.innerHTML = Object.entries(groups).map(([type, items]) =>
+                    `<optgroup label="── ${escHtml(type)} ──">` +
+                    items.map(m => `<option value="${escHtml(m.model_id)}">${escHtml(m.display_name)}</option>`).join('') +
+                    `</optgroup>`
+                ).join('');
+            } catch (e) {
+                document.getElementById('testModel').innerHTML = '<option value="">Failed to load</option>';
+                log(`AI models load failed: ${e.message}`, 'warn');
+            }
+        }
+
+        // ── Brief Agents ──────────────────────────────────────
+        async function loadBriefAgents() {
+            try {
+                const data = await api('GET', '/api/admin/agents');
+                const allAgents = data.agents || [];
+                const sel = document.getElementById('briefAgentSelect');
+
+                // Separate agents by type
+                const directJsonAgents = allAgents.filter(a =>
+                    a.stage_use === 'json' && !a.json_agent_id
+                );
+                const briefAgents = allAgents.filter(a =>
+                    a.stage_use === 'brief' || (a.stage_use === 'json' && a.json_agent_id)
+                );
+
+                let html = '';
+
+                // Default empty option — nothing pre-selected
+                html += '<option value="">— Select an agent (optional) —</option>';
+
+                // Direct JSON agents (single-pass)
+                if (directJsonAgents.length) {
+                    html += '<optgroup label="── Direct JSON Agents (Single-Pass) ──">';
+                    directJsonAgents.forEach(a => {
+                        html += `<option value="${escHtml(a.id)}">⚡ ${escHtml(a.display_name)}</option>`;
+                    });
+                    html += '</optgroup>';
+                }
+
+                // Brief agents (two-pass with linked JSON)
+                if (briefAgents.length) {
+                    html += '<optgroup label="── Brief + JSON Pipeline (Two-Pass) ──">';
+                    briefAgents.forEach(a => {
+                        const icon = a.stage_use === 'brief' ? '📋' : '🔗';
+                        html += `<option value="${escHtml(a.id)}">${icon} ${escHtml(a.display_name)}</option>`;
+                    });
+                    html += '</optgroup>';
+                }
+
+                // Fallback if no agents
+                if (!directJsonAgents.length && !briefAgents.length) {
+                    html += '<option value="">No agents found</option>';
+                }
+
+                sel.innerHTML = html;
+
+                log(`Loaded ${directJsonAgents.length} direct JSON + ${briefAgents.length} brief agents`, 'success');
+            } catch (e) {
+                document.getElementById('briefAgentSelect').innerHTML = '<option value="">Failed to load agents</option>';
+                log(`Brief agents load failed: ${e.message}`, 'warn');
+            }
+        }
+
+        window.onload = async () => {
+            const { data: { session } } = await sb.auth.getSession();
+            if (!session) { window.location.href = '/'; return; }
+            log('Authenticated — ready', 'success');
+            document.getElementById('logoutBtn').addEventListener('click', async e => {
+                e.preventDefault();
+                await sb.auth.signOut();
+                window.location.href = '/';
+            });
+            await Promise.all([loadIdeas(), loadTemplates(), loadBriefAgents(), loadTestModels()]);
+        };
+    </script>
 </body>
+
 </html>
