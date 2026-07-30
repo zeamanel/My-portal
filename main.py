@@ -77,6 +77,24 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 # ==================== FastAPI ====================
 app = FastAPI(title="Odaflux Internal Portal", description="Admin & agent portal")
 
+@app.get("/health")
+async def health():
+    try:
+        if supabase:
+            # Simple ping – list one row from a known table
+            supabase.table("profiles").select("id").limit(1).execute()
+            db_status = "connected"
+        else:
+            db_status = "missing credentials"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+
+    return {
+        "status": "ok",
+        "supabase": db_status,
+        "service": "my-portal"
+    }
+
 @app.get("/debug/env")
 async def debug_env():
     import os
