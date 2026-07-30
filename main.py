@@ -1,5 +1,7 @@
 import os
+import json
 import re
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, Request, HTTPException, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -9,6 +11,47 @@ from google import genai
 from google.genai import types
 import httpx
 from dotenv import load_dotenv
+from pydantic import BaseModel
+from typing import List
+
+from pydantic import create_model, Field
+from typing import List, Optional, Any
+
+def create_dynamic_model(schema: List[dict], model_name: str = "DynamicContent") -> Any:
+    """Create a Pydantic model from a schema definition."""
+    fields = {}
+    for field_def in schema:
+        field_name = field_def["name"]
+        field_type = field_def.get("type", "str")
+        required = field_def.get("required", False)
+        
+        # Map type string to Python type
+        type_map = {
+            "str": str,
+            "int": int,
+            "float": float,
+            "bool": bool,
+            "List[str]": List[str],
+            "List[int]": List[int],
+            "List[float]": List[float],
+        }
+        py_type = type_map.get(field_type, str)
+        
+        # If not required, make it Optional with default None
+        if not required:
+            py_type = Optional[py_type]
+            fields[field_name] = (py_type, Field(None))
+        else:
+            fields[field_name] = (py_type, ...)
+    
+    return create_model(model_name, **fields)
+
+class BrochureContent(BaseModel):
+    headline: str
+    tagline: str
+    intro_paragraph: str
+    features: List[str]   # 3-4 bullet points
+    cta_text: str
 
 load_dotenv()
 
@@ -906,6 +949,255 @@ async def get_gallery_images(
         "has_next": has_next,
         "has_prev": page > 1
     }
+
+# ==================== Brochure Generation (API Key Protected) ====================
+from jinja2 import Template as JinjaTemplate
+from weasyprint import HTML
+import uuid
+import os
+
+BROCHURE_API_KEY = os.getenv("BROCHURE_API_KEY", "")
+
+@app.post("/api/brochure/generate")
+async def generate_brochure(request: Request):
+    """
+    Generate a brochure PDF synchronously.
+    Protected by API key (X-API-Key header).
+    """
+    # Validate API key
+    api_key = request.headers.get("X-API-Key")
+    if not api_key or api_key != BROCHURE_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+    
+    body = await request.json()
+    design_style = body.get("design_style")
+    topic = body.get("topic")
+    target_audience = body.get("target_audience")
+    tone = body.get("tone")
+    include_image = body.get("include_image", True)
+    image_model = body.get("image_model", "black-forest-labs/flux.2-pro")
+    
+    if not design_style or not topic:
+        raise HTTPException(400, "design_style and topic required")
+    
+    # 1. Fetch template from Supabase
+    tpl_res = supabase.table("design_templates").select("*").eq("style_key", design_style).execute()
+    if not tpl_res.data:
+        raise HTTPException(404, f"Design style '{design_style}' not found")
+    template = tpl_res.data[0]
+    layout_hint = template.get("layout_hint", "")
+    
+    # 2. Generate text using call_llm – allow model selection
+    # Inside /api/brochure/generate, after fetching the template
+    text_model = body.get("text_model", "gemini-2.5-pro")  # use a capable model
+    sys_prompt = "You are a professional copywriter. Write engaging brochure copy in Amharic (or the language of the topic)."
+    user_prompt = f"Topic: {topic}\nTarget audience: {target_audience}\nTone: {tone}"
+
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        response = await client.aio.models.generate_content(
+            model=text_model,
+            contents=sys_prompt + "\n\n" + user_prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=BrochureContent,
+                temperature=0.7
+            )
+        )
+        content_data = json.loads(response.text)
+    except Exception as e:
+        raise HTTPException(500, f"Content generation failed with {text_model}: {str(e)}")
+    
+    # 3. Generate image (optional)
+    image_url = None
+    if include_image:
+        img_prompt = f"Create a high-quality image for a brochure about {topic}. Style: {design_style}, modern, clean."
+        if layout_hint:
+            img_prompt += f" Layout requirement: {layout_hint}"
+        
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            gen_payload = {
+                "user_id": ADMIN_USER_ID,
+                "prompt": img_prompt,
+                "model_id": image_model,
+                "aspect_ratio": "1:1",
+                "quality": "1K",
+                "is_public": False,
+                "skip_enhancement": False,
+                "context_enabled": False,
+            }
+            try:
+                gen_resp = await client.post(
+                    f"{MAIN_BACKEND_URL}/api/v1/generate",
+                    json=gen_payload,
+                    headers={"Content-Type": "application/json"}
+                )
+                gen_resp.raise_for_status()
+                gen_data = gen_resp.json()
+                image_url = gen_data.get("url") or gen_data.get("image_url")
+            except Exception as e:
+                print(f"Image generation failed: {e}")
+    
+    # 4. Render HTML
+    html_content = JinjaTemplate(template["html_template"]).render(
+        title=topic,
+        image_url=image_url or "",
+        css=template.get("css", ""),
+        headline=content_data.get("headline"),
+        tagline=content_data.get("tagline"),
+        intro=content_data.get("intro_paragraph"),
+        features=content_data.get("features", []),
+        cta=content_data.get("cta_text")
+    )
+    
+    # 5. Convert to PDF
+    try:
+        pdf_bytes = HTML(string=html_content).write_pdf()
+    except Exception as e:
+        raise HTTPException(500, f"PDF generation failed: {str(e)}")
+    
+    # 6. Upload to Supabase Storage
+    bucket = supabase.storage.from_("brochures")
+    filename = f"brochure_{uuid.uuid4()}.pdf"
+    try:
+        bucket.upload(filename, pdf_bytes, {"content-type": "application/pdf"})
+        public_url = bucket.get_public_url(filename)
+    except Exception as e:
+        # Fallback: return inline PDF
+        return Response(content=pdf_bytes, media_type="application/pdf",
+                        headers={"Content-Disposition": f"attachment; filename={filename}"})
+    
+    # 7. Save metadata
+    supabase.table("generated_brochures").insert({
+        "user_id": None,
+        "template_id": template["id"],
+        "input_params": body,
+        "generated_text": json.dumps(content_data),
+        "generated_image_url": image_url,
+        "pdf_url": public_url,
+        "status": "completed"
+    }).execute()
+    
+    return Response(content=pdf_bytes, media_type="application/pdf",
+                    headers={"Content-Disposition": f"attachment; filename={filename}",
+                             "X-PDF-URL": public_url})
+
+# ==================== Internal Brochure Endpoint (for lulit) ====================
+INTERNAL_BROCHURE_KEY = os.getenv("INTERNAL_BROCHURE_KEY", "")
+
+@app.post("/api/brochure/generate/internal")
+async def generate_brochure_internal(request: Request):
+    # Validate internal key
+    internal_key = request.headers.get("X-Internal-Key")
+    if not internal_key or internal_key != INTERNAL_BROCHURE_KEY:
+        raise HTTPException(401, "Invalid internal key")
+    
+    user_id = request.headers.get("X-User-Id")
+    if not user_id:
+        raise HTTPException(400, "Missing X-User-Id header")
+    
+    body = await request.json()
+    design_style = body.get("design_style")
+    topic = body.get("topic")
+    target_audience = body.get("target_audience")
+    tone = body.get("tone")
+    include_image = body.get("include_image", True)
+    image_model = body.get("image_model", "black-forest-labs/flux.2-pro")
+    text_model = body.get("text_model", "gemini-2.5-pro")
+    
+    if not design_style or not topic:
+        raise HTTPException(400, "design_style and topic required")
+    
+    # Fetch template
+    tpl_res = supabase.table("design_templates").select("*").eq("style_key", design_style).execute()
+    if not tpl_res.data:
+        raise HTTPException(404, f"Design style '{design_style}' not found")
+    template = tpl_res.data[0]
+    layout_hint = template.get("layout_hint", "")
+    
+    # --- Dynamic schema generation ---
+    schema_def = template.get("llm_schema")
+    if not schema_def:
+        raise HTTPException(400, f"Template '{design_style}' has no llm_schema defined")
+    
+    # Create dynamic Pydantic model
+    DynamicModel = create_dynamic_model(schema_def)
+    
+    # Build system prompt (generic)
+    sys_prompt = "You are a professional copywriter. Write engaging brochure copy. Return a JSON object that exactly matches the requested schema. All required fields must be filled."
+    user_prompt = f"Topic: {topic}\nTarget audience: {target_audience}\nTone: {tone}"
+    
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    response = await client.aio.models.generate_content(
+        model=text_model,
+        contents=sys_prompt + "\n\n" + user_prompt,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=DynamicModel,
+            temperature=0.7
+        )
+    )
+    content_data = json.loads(response.text)
+    
+    # Generate image (optional)
+    image_url = None
+    if include_image:
+        img_prompt = f"Create a high-quality image for a brochure about {topic}. Style: {design_style}, modern, clean."
+        if layout_hint:
+            img_prompt += f" Layout requirement: {layout_hint}"
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            gen_payload = {
+                "user_id": ADMIN_USER_ID,
+                "prompt": img_prompt,
+                "model_id": image_model,
+                "aspect_ratio": "1:1",
+                "quality": "1K",
+                "is_public": False,
+                "skip_enhancement": False,
+                "context_enabled": False,
+            }
+            try:
+                gen_resp = await client.post(
+                    f"{MAIN_BACKEND_URL}/api/v1/generate",
+                    json=gen_payload,
+                    headers={"Content-Type": "application/json"}
+                )
+                gen_resp.raise_for_status()
+                gen_data = gen_resp.json()
+                image_url = gen_data.get("url") or gen_data.get("image_url")
+            except Exception as e:
+                print(f"Image generation failed: {e}")
+    
+    # Render HTML
+    render_vars = {
+        "title": topic,
+        "image_url": image_url or "",
+        "css": template.get("css", ""),
+        **content_data   # all fields from the dynamic model
+    }
+    html_content = JinjaTemplate(template["html_template"]).render(**render_vars)
+    
+    # Convert to PDF
+    pdf_bytes = HTML(string=html_content).write_pdf()
+    
+    # Upload to Supabase Storage under user-specific folder
+    bucket = supabase.storage.from_("brochures")
+    filename = f"{user_id}/{uuid.uuid4()}.pdf"
+    bucket.upload(filename, pdf_bytes, {"content-type": "application/pdf"})
+    public_url = bucket.get_public_url(filename)
+    
+    # Save metadata
+    supabase.table("generated_brochures").insert({
+        "user_id": user_id,
+        "template_id": template["id"],
+        "input_params": body,
+        "generated_text": json.dumps(content_data),
+        "generated_image_url": image_url,
+        "pdf_url": public_url,
+        "status": "completed"
+    }).execute()
+    
+    return {"pdf_url": public_url}
 
 if __name__ == "__main__":
     import os
