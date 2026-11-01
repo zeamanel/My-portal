@@ -701,6 +701,194 @@ async def admin_users_page(request: Request):
 async def gallery_page(request: Request):
     return templates.TemplateResponse("gallery.html", {"request": request})
 
+@app.get("/payments")
+async def payments_dashboard_page(request: Request):
+    return templates.TemplateResponse("payments_dashboard.html", {"request": request})
+
+# ==================== Central Chapa Payment Gateway ====================
+import payment_gateway
+
+@app.post("/api/v1/payments/initiate")
+async def gateway_initiate_payment(request: Request):
+    """
+    Central Payment Initiation endpoint for all 4 webapps.
+    Authenticates via header: X-App-Key
+    """
+    api_key = request.headers.get("X-App-Key", "").strip()
+    app_info = payment_gateway.get_app_by_key(api_key)
+    if not app_info:
+        raise HTTPException(401, "Invalid or missing X-App-Key header")
+    if not app_info.get("is_active", True):
+        raise HTTPException(403, "Client application is disabled")
+    
+    body = await request.json()
+    amount_etb = body.get("amount_etb") or body.get("amount")
+    if not amount_etb or float(amount_etb) <= 0:
+        raise HTTPException(400, "Valid amount_etb required")
+    
+    try:
+        result = await payment_gateway.initiate_payment(
+            app_id=app_info["app_id"],
+            amount_etb=float(amount_etb),
+            currency=body.get("currency", "ETB"),
+            tx_ref=body.get("tx_ref"),
+            user_id=body.get("user_id"),
+            email=body.get("email"),
+            phone_number=body.get("phone_number"),
+            first_name=body.get("first_name"),
+            last_name=body.get("last_name"),
+            callback_url=body.get("callback_url") or app_info.get("webhook_url"),
+            return_url=body.get("return_url"),
+            metadata=body.get("metadata") or body.get("meta")
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+@app.api_route("/api/v1/payments/verify/{tx_ref}", methods=["GET", "POST"])
+async def gateway_verify_payment(tx_ref: str):
+    """Verify transaction with Chapa and update database."""
+    try:
+        return await payment_gateway.verify_payment(tx_ref)
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+# Backwards compatibility routes for existing callers (Musa AI, Ethiogram, etc.)
+@app.post("/api/v1/chapa/initiate")
+async def chapa_initiate_legacy(request: Request):
+    """Drop-in compatible initiate route for existing webapps."""
+    api_key = request.headers.get("X-App-Key", "").strip()
+    app_info = payment_gateway.get_app_by_key(api_key)
+    body = await request.json()
+    
+    # Infer app if key not sent
+    if app_info:
+        app_id = app_info["app_id"]
+    else:
+        meta = body.get("meta", {})
+        platform = meta.get("platform") if isinstance(meta, dict) else None
+        app_id = platform or "musa-ai"
+    
+    amount_etb = body.get("amount_etb") or body.get("amount")
+    if not amount_etb:
+        raise HTTPException(400, "amount_etb required")
+    
+    try:
+        result = await payment_gateway.initiate_payment(
+            app_id=app_id,
+            amount_etb=float(amount_etb),
+            currency="ETB",
+            tx_ref=body.get("tx_ref"),
+            user_id=body.get("user_id"),
+            email=body.get("email"),
+            phone_number=body.get("phone_number"),
+            first_name=body.get("first_name"),
+            last_name=body.get("last_name"),
+            callback_url=body.get("callback_url"),
+            return_url=body.get("return_url"),
+            metadata=body.get("meta")
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+@app.api_route("/api/v1/chapa/verify/{tx_ref}", methods=["GET", "POST"])
+async def chapa_verify_legacy(tx_ref: str):
+    """Drop-in compatible verify route."""
+    return await payment_gateway.verify_payment(tx_ref)
+
+@app.post("/api/v1/payments/webhook")
+@app.post("/api/v1/chapa/webhook")
+async def gateway_webhook(request: Request):
+    """Chapa Webhook receiver: marks transaction completed & forwards event to client app."""
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON payload")
+    
+    signature = request.headers.get("x-chapa-signature")
+    try:
+        return await payment_gateway.handle_chapa_webhook(payload, signature=signature)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+# ==================== Admin Payments API ====================
+@app.get("/api/admin/payments/stats")
+async def admin_payment_stats(admin=Depends(admin_required)):
+    transactions = list(db.collection("payment_transactions").stream())
+    total_etb = 0.0
+    completed = 0
+    pending = 0
+    failed = 0
+    for doc in transactions:
+        t = doc.to_dict()
+        amt = float(t.get("amount_etb", 0) or 0)
+        st = t.get("status", "pending")
+        if st == "completed":
+            total_etb += amt
+            completed += 1
+        elif st == "failed":
+            failed += 1
+        else:
+            pending += 1
+    
+    total = len(transactions)
+    success_rate = f"{(completed / total * 100):.1f}%" if total > 0 else "100%"
+    apps = payment_gateway.list_client_apps()
+    
+    return {
+        "total_volume_etb": total_etb,
+        "total_transactions": total,
+        "completed_count": completed,
+        "pending_count": pending,
+        "failed_count": failed,
+        "success_rate": success_rate,
+        "apps_count": len(apps)
+    }
+
+@app.get("/api/admin/payments/transactions")
+async def admin_list_transactions(app_id: Optional[str] = None, limit: int = 50, admin=Depends(admin_required)):
+    query = db.collection("payment_transactions")
+    if app_id:
+        query = query.where(filter=firestore.FieldFilter("app_id", "==", app_id))
+    docs = list(query.limit(limit).stream())
+    results = [{"id": d.id, **d.to_dict()} for d in docs]
+    results.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return {"transactions": results}
+
+@app.get("/api/admin/payments/apps")
+async def admin_get_apps(admin=Depends(admin_required)):
+    payment_gateway.ensure_default_apps()
+    return {"apps": payment_gateway.list_client_apps()}
+
+@app.post("/api/admin/payments/apps")
+async def admin_register_app(request: Request, admin=Depends(admin_required)):
+    body = await request.json()
+    name = body.get("name")
+    if not name:
+        raise HTTPException(400, "App name required")
+    app_data = payment_gateway.register_client_app(
+        name=name,
+        app_id=body.get("app_id"),
+        webhook_url=body.get("webhook_url", ""),
+        description=body.get("description", "")
+    )
+    return {"app": app_data}
+
+@app.post("/api/admin/payments/test-checkout")
+async def admin_test_checkout(request: Request, admin=Depends(admin_required)):
+    body = await request.json()
+    try:
+        return await payment_gateway.initiate_payment(
+            app_id=body.get("app_id", "musa-ai"),
+            amount_etb=float(body.get("amount_etb", 100)),
+            user_id=body.get("user_id", "admin-test"),
+            email=body.get("email", "customer@odaflux.com")
+        )
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 # ==================== static files (optional) ====================
 from fastapi.staticfiles import StaticFiles
 if os.path.exists("static"):
