@@ -22,6 +22,7 @@ DEFAULT_APPS = [
         "app_id": "musa-ai",
         "name": "Musa AI / Odaflux",
         "api_key": "chp_live_musa_ai_8f3d120a9c4b",
+        "webhook_secret": "whsec_live_musa_ai_19f8b2d4",
         "webhook_url": "https://musa-ai-backend-1045664496839.us-central1.run.app/api/v1/chapa/webhook",
         "description": "Image/Video generation platform credits recharge",
         "is_active": True
@@ -30,6 +31,7 @@ DEFAULT_APPS = [
         "app_id": "ethiogram",
         "name": "Ethiogram",
         "api_key": "chp_live_ethiogram_4e9b210c8a7f",
+        "webhook_secret": "whsec_live_ethiogram_8b7d42a1",
         "webhook_url": "https://ethiogram.com/api/billing/chapa-webhook",
         "description": "Ethiogram Telegram marketing platform balance",
         "is_active": True
@@ -38,6 +40,7 @@ DEFAULT_APPS = [
         "app_id": "shaleqa",
         "name": "Shaleqa",
         "api_key": "chp_live_shaleqa_7b1d439a2e5c",
+        "webhook_secret": "whsec_live_shaleqa_5c3a90e2",
         "webhook_url": "https://shaleqa-backend-1045664496839.us-central1.run.app/api/v1/payments/chapa-callback",
         "description": "Shaleqa marketplace orders and customer payments",
         "is_active": True
@@ -46,6 +49,7 @@ DEFAULT_APPS = [
         "app_id": "system-backend",
         "name": "System Backend",
         "api_key": "chp_live_sys_backend_9c8a143f5d2b",
+        "webhook_secret": "whsec_live_sys_backend_e4b1029c",
         "webhook_url": "https://system-backend-1045664496839.us-central1.run.app/api/v1/payments/callback",
         "description": "Internal business workflows & vendor settlements",
         "is_active": True
@@ -53,7 +57,7 @@ DEFAULT_APPS = [
 ]
 
 def ensure_default_apps():
-    """Seed the 4 default client apps in Firestore if not already present."""
+    """Seed or update the 4 default client apps in Firestore."""
     db = get_firestore_client()
     coll = db.collection("payment_apps")
     for app in DEFAULT_APPS:
@@ -63,6 +67,13 @@ def ensure_default_apps():
             app_data["created_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
             coll.document(app["app_id"]).set(app_data)
             print(f"  + Registered client app: {app['name']} (Key: {app['api_key']})")
+        else:
+            # Update webhook_secret if missing
+            doc_data = doc.to_dict() or {}
+            if not doc_data.get("webhook_secret"):
+                coll.document(app["app_id"]).update({
+                    "webhook_secret": app["webhook_secret"]
+                })
 
 def get_app_by_key(api_key: str) -> Optional[Dict[str, Any]]:
     """Look up a client app by its API key."""
@@ -90,10 +101,12 @@ def register_client_app(name: str, app_id: Optional[str] = None, webhook_url: st
         app_id = "".join([c for c in app_id if c.isalnum() or c == "-"])
     
     api_key = f"chp_live_{app_id[:12]}_{secrets.token_hex(6)}"
+    webhook_secret = f"whsec_live_{app_id[:12]}_{secrets.token_hex(6)}"
     data = {
         "app_id": app_id,
         "name": name,
         "api_key": api_key,
+        "webhook_secret": webhook_secret,
         "webhook_url": webhook_url,
         "description": description,
         "is_active": True,
@@ -284,23 +297,37 @@ async def handle_chapa_webhook(payload: Dict[str, Any], signature: Optional[str]
     if app_id:
         app_doc = db.collection("payment_apps").document(app_id).get()
         if app_doc.exists:
-            target_url = app_doc.to_dict().get("webhook_url")
+            app_info = app_doc.to_dict() or {}
+            target_url = app_info.get("webhook_url")
             if target_url:
+                forward_data = {
+                    "event": "payment.success",
+                    "tx_ref": tx_ref,
+                    "app_id": app_id,
+                    "user_id": record.get("user_id"),
+                    "amount_etb": record.get("amount_etb"),
+                    "status": "completed",
+                    "metadata": record.get("metadata", {}),
+                    "chapa_data": payload
+                }
+                raw_json = json.dumps(forward_data, separators=(',', ':'))
+                # Compute HMAC signature with webhook_secret (or fallback to api_key)
+                secret = app_info.get("webhook_secret") or app_info.get("api_key") or "secret"
+                signature = hmac.new(secret.encode('utf-8'), raw_json.encode('utf-8'), hashlib.sha256).hexdigest()
+
+                headers = {
+                    "Content-Type": "application/json",
+                    "X-Portal-Signature": signature,
+                    "X-Portal-App-Id": app_id,
+                    "X-Portal-Forward": "true"
+                }
+
                 try:
                     async with httpx.AsyncClient(timeout=10.0) as client:
                         f_resp = await client.post(
                             target_url,
-                            json={
-                                "event": "payment.success",
-                                "tx_ref": tx_ref,
-                                "app_id": app_id,
-                                "user_id": record.get("user_id"),
-                                "amount_etb": record.get("amount_etb"),
-                                "status": "completed",
-                                "metadata": record.get("metadata", {}),
-                                "chapa_data": payload
-                            },
-                            headers={"X-Portal-Forward": "true"}
+                            content=raw_json,
+                            headers=headers
                         )
                         forward_status = f"forwarded (HTTP {f_resp.status_code})"
                 except Exception as e:

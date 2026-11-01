@@ -378,10 +378,20 @@
                     <td><strong>${a.name}</strong><br><small style="color: #94a3b8;">${a.description || ''}</small></td>
                     <td><span class="badge badge-app">${a.app_id}</span></td>
                     <td>
-                        <span class="key-box">
-                            <span>${a.api_key}</span>
-                            <button class="copy-btn" onclick="copyToClipboard('${a.api_key}', this)" title="Copy Key"><i class="fas fa-copy"></i></button>
-                        </span>
+                        <div style="margin-bottom: 6px;">
+                            <span style="font-size: 10px; color: #64748b; font-weight: 600;">API KEY (X-App-Key)</span><br>
+                            <span class="key-box">
+                                <span>${a.api_key}</span>
+                                <button class="copy-btn" onclick="copyToClipboard('${a.api_key}', this)" title="Copy Key"><i class="fas fa-copy"></i></button>
+                            </span>
+                        </div>
+                        <div>
+                            <span style="font-size: 10px; color: #64748b; font-weight: 600;">WEBHOOK SECRET (HMAC)</span><br>
+                            <span class="key-box" style="color: #a78bfa;">
+                                <span>${a.webhook_secret || 'whsec_' + a.app_id}</span>
+                                <button class="copy-btn" onclick="copyToClipboard('${a.webhook_secret}', this)" title="Copy Secret"><i class="fas fa-copy"></i></button>
+                            </span>
+                        </div>
                     </td>
                     <td style="font-family: monospace; font-size: 11px; color: #94a3b8;">${a.webhook_url || 'None configured'}</td>
                     <td><span class="badge ${a.is_active ? 'badge-success' : 'badge-failed'}">${a.is_active ? 'Active' : 'Disabled'}</span></td>
