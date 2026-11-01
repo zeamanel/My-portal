@@ -40,3 +40,7 @@ timeout: 1800s
 # Use the Cloud Build service account with necessary permissions
 options:
   logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  COMMIT_SHA: 'latest'
+
