@@ -55,43 +55,48 @@ class BrochureContent(BaseModel):
 
 load_dotenv()
 
-# ==================== Supabase ====================
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+# ==================== Google Cloud Infrastructure (Firestore + Storage) ====================
+from gcp_client import (
+    SupabaseGCPAdapter,
+    get_firestore_client,
+    get_storage_client,
+    hash_password,
+    verify_password,
+    create_access_token,
+    decode_access_token,
+    ODA_BRAIN_BUCKET,
+    BROCHURES_BUCKET
+)
+
+# Use GCP Native Adapter (Firestore + Cloud Storage)
+supabase = SupabaseGCPAdapter()
+db = get_firestore_client()
 
 # ==================== Generation Backend ====================
 ADMIN_USER_ID = os.getenv("ADMIN_USER_ID", "fc6f2b43-739c-4e8e-9e67-bd2389288922")
-MAIN_BACKEND_URL = os.getenv("MAIN_BACKEND_URL", "https://musa-ai-backend-760742977917.us-central1.run.app")
-
-if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
-    print("WARNING: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set. The app may not function correctly.")
-    # Do NOT raise – let the app start anyway so we can debug.
-    supabase = None
-else:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+MAIN_BACKEND_URL = os.getenv("MAIN_BACKEND_URL", "https://musa-ai-backend-1045664496839.us-central1.run.app")
 
 # ==================== Gemini & OpenRouter ====================
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 # ==================== FastAPI ====================
-app = FastAPI(title="Odaflux Internal Portal", description="Admin & agent portal")
+app = FastAPI(title="Odaflux Internal Portal", description="Admin & agent portal (Powered by Google Cloud)")
 
 @app.get("/health")
 async def health():
     try:
-        if supabase:
-            # Simple ping – list one row from a known table
-            supabase.table("profiles").select("id").limit(1).execute()
-            db_status = "connected"
-        else:
-            db_status = "missing credentials"
+        res = supabase.table("authorized_users").select("id").limit(1).execute()
+        db_status = "connected" if res.data else "connected (empty)"
     except Exception as e:
         db_status = f"error: {str(e)}"
 
     return {
         "status": "ok",
-        "supabase": db_status,
+        "database": "Google Cloud Firestore",
+        "storage": "Google Cloud Storage",
+        "buckets": [ODA_BRAIN_BUCKET, BROCHURES_BUCKET],
+        "firestore_status": db_status,
         "service": "my-portal"
     }
 
@@ -99,29 +104,67 @@ async def health():
 async def debug_env():
     import os
     return {
-        "SUPABASE_URL": os.getenv("SUPABASE_URL"),
-        "SUPABASE_SERVICE_ROLE_KEY": os.getenv("SUPABASE_SERVICE_ROLE_KEY"),
-        "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY"),
+        "DATABASE": "Google Cloud Firestore (betcare)",
+        "STORAGE": "Google Cloud Storage",
+        "ODA_BRAIN_BUCKET": ODA_BRAIN_BUCKET,
+        "BROCHURES_BUCKET": BROCHURES_BUCKET,
+        "MAIN_BACKEND_URL": MAIN_BACKEND_URL,
+        "GEMINI_API_KEY_CONFIGURED": bool(GEMINI_API_KEY),
         "ALL_ENV_KEYS": list(os.environ.keys())
     }
 
 templates = Jinja2Templates(directory="templates")
 
-# ==================== Auth Dependency ====================
+# ==================== Auth Dependency & Login ====================
+@app.post("/api/auth/login")
+async def auth_login(request: Request):
+    body = await request.json()
+    email = body.get("email", "").strip().lower()
+    password = body.get("password", "")
+    if not email or not password:
+        raise HTTPException(400, "Email and password required")
+    
+    res = supabase.table("authorized_users").select("*").eq("email", email).execute()
+    if not res.data:
+        raise HTTPException(401, "Invalid email or password")
+    
+    user_data = res.data[0]
+    pwd_hash = user_data.get("password_hash")
+    if pwd_hash:
+        if not verify_password(password, pwd_hash):
+            raise HTTPException(401, "Invalid email or password")
+    
+    token = create_access_token({
+        "sub": email,
+        "id": user_data.get("id"),
+        "role": user_data.get("role", "worker")
+    })
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user_data.get("id"),
+            "email": email,
+            "role": user_data.get("role", "worker")
+        }
+    }
+
 async def get_current_user(request: Request):
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header.replace("Bearer ", "").strip()
     if not token:
-        # If not an API call, maybe redirect to login page? We'll handle in HTML.
         raise HTTPException(status_code=401, detail="Not authenticated")
-    try:
-        user = supabase.auth.get_user(token)
-        email = user.user.email
-        res = supabase.table("authorized_users").select("id, role").eq("email", email).execute()
-        if not res.data:
-            raise HTTPException(status_code=403, detail="Access denied")
-        return {"id": res.data[0]["id"], "email": email, "role": res.data[0]["role"]}
-    except Exception as e:
+    
+    payload = decode_access_token(token)
+    if not payload or not payload.get("sub"):
         raise HTTPException(status_code=401, detail="Invalid token")
+    
+    email = payload["sub"].strip().lower()
+    res = supabase.table("authorized_users").select("id, role").eq("email", email).execute()
+    if not res.data:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    return {"id": res.data[0]["id"], "email": email, "role": res.data[0].get("role", "worker")}
 
 async def admin_required(current_user=Depends(get_current_user)):
     if current_user["role"] != "admin":
@@ -612,8 +655,11 @@ async def admin_create_user(request: Request, admin=Depends(admin_required)):
     data = await request.json()
     if "email" not in data:
         raise HTTPException(400, "Missing email")
+    data["email"] = data["email"].strip().lower()
     if "role" not in data:
         data["role"] = "worker"
+    if "password" in data and data["password"]:
+        data["password_hash"] = hash_password(data.pop("password"))
     res = supabase.table("authorized_users").insert(data).execute()
     return {"user": res.data[0]}
 
@@ -970,7 +1016,10 @@ async def get_gallery_images(
 
 # ==================== Brochure Generation (API Key Protected) ====================
 from jinja2 import Template as JinjaTemplate
-from weasyprint import HTML
+try:
+    from weasyprint import HTML
+except (ImportError, OSError):
+    HTML = None
 import uuid
 import os
 

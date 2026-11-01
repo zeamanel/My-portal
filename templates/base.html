@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Odaflux Portal</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <style>
         * {
             margin: 0;
@@ -140,20 +140,33 @@
         {% block content %}{% endblock %}
     </div>
     <script>
-        const SUPABASE_URL = "{{ supabase_url or '' }}";
-        const SUPABASE_ANON_KEY = "{{ supabase_anon_key or '' }}";
-        // You'll pass these from the backend or use environment; for now we'll set from window.
-        window.supabaseClient = null;
-        async function initSupabase() {
-            if (typeof supabase === 'undefined') return;
-            // You can read from env or hardcode – we'll fetch from meta or from backend injected.
-            const url = "{{ request.url_for('home') }}".replace(/\/$/, '');
-            // Actually we need to get from backend config. Simpler: set in script from backend variable.
+        // Supabase Compatibility Auth Bridge (Powered by Native Google Cloud / JWT)
+        window.getAuthToken = function() {
+            return localStorage.getItem('portal_token');
+        };
+
+        window.supabaseClient = {
+            auth: {
+                getSession: async function() {
+                    const token = localStorage.getItem('portal_token');
+                    return { data: { session: token ? { access_token: token } : null } };
+                },
+                signOut: async function() {
+                    localStorage.removeItem('portal_token');
+                    localStorage.removeItem('portal_user');
+                    window.location.href = '/';
+                }
+            }
+        };
+
+        // Enforce auth check on protected views
+        if (!window.getAuthToken()) {
+            window.location.href = '/';
         }
+
         document.getElementById('logoutBtn')?.addEventListener('click', async (e) => {
             e.preventDefault();
-            const { error } = await window.supabaseClient?.auth.signOut();
-            window.location.href = '/';
+            await window.supabaseClient.auth.signOut();
         });
     </script>
 </body>

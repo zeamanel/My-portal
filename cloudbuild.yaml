@@ -27,7 +27,7 @@ steps:
       - 'managed'
       - '--allow-unauthenticated'
       - '--port'
-      - '8000'
+      - '8080'
 
 images:
   - 'gcr.io/$PROJECT_ID/my-portal:$COMMIT_SHA'

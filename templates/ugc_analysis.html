@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Annotation – Odaflux</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
@@ -239,17 +239,14 @@
 </div>
 
 <script>
-    const SB_URL = "https://vjcumvumnnvgncnbbtzk.supabase.co";
-    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqY3VtdnVtbm52Z25jbmJidHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5MjQwOTMsImV4cCI6MjA4MzUwMDA5M30.6YtPHl9EXnRNDtdUIMkNbLLyUvuk9hG3k1gHjn14qd4";
-    const sb = window.supabase.createClient(SB_URL, SB_KEY);
-
     let currentImageUrl = null;
     let currentSource = 'upload';
 
+    // ── Auth (Google Cloud JWT Session) ──────────────────────────────
     async function getToken() {
-        const { data: { session } } = await sb.auth.getSession();
-        if (!session) { window.location.href = '/'; throw new Error('Not authenticated'); }
-        return session.access_token;
+        const token = localStorage.getItem('portal_token');
+        if (!token) { window.location.href = '/'; throw new Error('Not authenticated'); }
+        return token;
     }
 
     async function api(method, path, body) {

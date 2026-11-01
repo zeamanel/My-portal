@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OCR Prompts – Context Images Builder</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+
     <style>
         * {
             box-sizing: border-box;
@@ -289,21 +289,13 @@
     </div>
 
     <script>
-        // Supabase client for auth (only to get JWT)
-        const supabaseUrl = "https://vjcumvumnnvgncnbbtzk.supabase.co";
-        const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqY3VtdnVtbm52Z25jbmJidHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5MjQwOTMsImV4cCI6MjA4MzUwMDA5M30.6YtPHl9EXnRNDtdUIMkNbLLyUvuk9hG3k1gHjn14qd4";
-        const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
-        let currentUser = null;
-        let images = [];
-        let selectedUrls = new Set();
-
         async function getToken() {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
+            const token = localStorage.getItem('portal_token');
+            if (!token) {
                 window.location.href = '/';
                 throw new Error("Not authenticated");
             }
-            return session.access_token;
+            return token;
         }
 
         function log(msg, type = 'info') {

@@ -1,7 +1,7 @@
 import requests
 import json
 
-url = "https://my-portal-760742977917.us-central1.run.app/api/brochure/generate"
+url = "https://my-portal-1045664496839.us-central1.run.app/api/brochure/generate"
 headers = {
     "X-API-Key": "0112750803",
     "Content-Type": "application/json; charset=utf-8"

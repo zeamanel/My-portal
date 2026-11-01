@@ -27,8 +27,7 @@
     let currentImageUrl = null;
     let agentsList = [];
 
-    const supabaseUrl = "{{ supabase_url }}";
-    const supabaseAnon = "{{ supabase_anon_key }}";
+
 
     async function fetchAgents() {
         const token = (await supabaseClient.auth.getSession()).data.session?.access_token;

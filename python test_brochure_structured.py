@@ -11,7 +11,7 @@ import requests
 import json
 
 # Configuration
-PORTAL_URL = "https://my-portal-760742977917.us-central1.run.app/api/brochure/generate"
+PORTAL_URL = "https://my-portal-1045664496839.us-central1.run.app/api/brochure/generate"
 API_KEY = "0112750803"  # Must match BROCHURE_API_KEY in Cloud Run
 
 # Test payload with latest Gemini models
