@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import hashlib
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, Request, HTTPException, Depends, Form
@@ -95,16 +96,6 @@ async def health():
         "service": "my-portal"
     }
 
-@app.get("/debug/env")
-async def debug_env():
-    import os
-    return {
-        "SUPABASE_URL": os.getenv("SUPABASE_URL"),
-        "SUPABASE_SERVICE_ROLE_KEY": os.getenv("SUPABASE_SERVICE_ROLE_KEY"),
-        "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY"),
-        "ALL_ENV_KEYS": list(os.environ.keys())
-    }
-
 templates = Jinja2Templates(directory="templates")
 
 # ==================== Auth Dependency ====================
@@ -127,6 +118,40 @@ async def admin_required(current_user=Depends(get_current_user)):
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin rights required")
     return current_user
+
+# ==================== Debug ====================
+def _fingerprint(value: Optional[str]) -> Dict[str, Any]:
+    """Enough to confirm *which* secret is loaded, not enough to use it."""
+    if not value:
+        return {"set": False}
+    return {
+        "set": True,
+        "length": len(value),
+        "prefix": value[:4],
+        "sha256_8": hashlib.sha256(value.encode()).hexdigest()[:8],
+    }
+
+@app.get("/debug/env")
+async def debug_env(admin=Depends(admin_required)):
+    """Admin-only, and secrets are fingerprinted rather than echoed.
+
+    This endpoint previously returned SUPABASE_SERVICE_ROLE_KEY and
+    GEMINI_API_KEY in plaintext with no auth dependency, on a service deployed
+    --allow-unauthenticated: anyone with the URL could read both. If that
+    version was ever live, treat both keys as compromised and rotate them.
+    The service-role key matters most — it bypasses row-level security, which
+    is the only thing protecting the payment ledger.
+    """
+    return {
+        # Not a secret: the anon-key client in the templates already exposes it.
+        "SUPABASE_URL": os.getenv("SUPABASE_URL"),
+        "SUPABASE_SERVICE_ROLE_KEY": _fingerprint(os.getenv("SUPABASE_SERVICE_ROLE_KEY")),
+        "GEMINI_API_KEY": _fingerprint(os.getenv("GEMINI_API_KEY")),
+        "OPENROUTER_API_KEY": _fingerprint(os.getenv("OPENROUTER_API_KEY")),
+        "CHAPA_SECRET_KEY": _fingerprint(os.getenv("CHAPA_SECRET_KEY")),
+        "CHAPA_WEBHOOK_SECRET": _fingerprint(os.getenv("CHAPA_WEBHOOK_SECRET")),
+        "ENV_KEYS": sorted(os.environ.keys()),
+    }
 
 # ==================== Helper: Call LLM (Gemini or OpenRouter) ====================
 def _gemini_api_version(model_name: str) -> str:
@@ -654,6 +679,13 @@ async def admin_users_page(request: Request):
 @app.get("/gallery")
 async def gallery_page(request: Request):
     return templates.TemplateResponse("gallery.html", {"request": request})
+
+@app.get("/payments")
+async def payments_page(request: Request):
+    # Ungated like the other page routes: the browser navigates here without an
+    # Authorization header, then the page's JS calls the admin-gated
+    # /api/payments/* endpoints with the Supabase session token.
+    return templates.TemplateResponse("payments.html", {"request": request})
 
 # ==================== static files (optional) ====================
 from fastapi.staticfiles import StaticFiles
@@ -1216,6 +1248,29 @@ async def generate_brochure_internal(request: Request):
     }).execute()
     
     return {"pdf_url": public_url}
+
+# ==================== Chapa payment broker ====================
+from app.routers import chapa_internal, chapa_webhook, payments_dashboard
+
+# Service-to-service. Each route depends on require_gcloud_caller, which
+# verifies the caller's Google ID token and resolves it to an app_id.
+#
+# NOTE: this app-level check is the ONLY gate on these routes. A Cloud Run
+# run.invoker binding cannot also protect them, because Cloud Run auth is
+# per-service, not per-path, and this same service has to stay publicly
+# reachable for the Chapa webhook and the browser pages.
+app.include_router(chapa_internal.router)
+
+# Public by necessity: Chapa cannot present a Google ID token. Authenticity is
+# the HMAC signature; correctness is the independent verify() call.
+app.include_router(chapa_webhook.router)
+
+# Admin-only dashboard API. The admin dependency is injected here rather than
+# imported by the router, which keeps app/ from importing back into main.
+app.include_router(
+    payments_dashboard.router,
+    dependencies=[Depends(admin_required)],
+)
 
 if __name__ == "__main__":
     import os

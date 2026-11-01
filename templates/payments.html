@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payments — Odaflux Portal</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+    <style>
+        /* The portal is a dark-only app (body is #0f172a in base.html), so these
+           are the single set of tokens. The four series colours were validated
+           against this page's actual card surface (#1e293b), not a generic dark
+           surface: adjacent CVD dE 8.4, normal-vision dE 19.8, all >= 3:1
+           contrast. Re-run the validator if any of them changes. */
+        :root {
+            --page: #0f172a;
+            --surface: #1e293b;
+            --surface-inset: #0f172a;
+            --hairline: #334155;
+            --ink: #e2e8f0;
+            --ink-secondary: #94a3b8;
+            --ink-muted: #64748b;
+            --accent: #38bdf8;
+
+            /* Categorical — one per business, fixed. Never reassigned by rank,
+               so filtering others out never repaints the survivors. */
+            --series-odaflux: #3987e5;
+            --series-shaleqa: #d95926;
+            --series-ethiogram: #199e70;
+            --series-behalf: #c98500;
+
+            /* Status — reserved, never reused as a series colour. */
+            --status-success: #0ca30c;
+            --status-pending: #fab219;
+            --status-failed: #d03b3b;
+            --status-refunded: #ec835a;
+            --status-cancelled: #898781;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+            background: var(--page);
+            color: var(--ink);
+        }
+
+        .navbar {
+            background: var(--surface);
+            padding: 14px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--hairline);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .navbar a {
+            color: var(--ink-secondary);
+            text-decoration: none;
+            margin-left: 24px;
+            font-weight: 600;
+        }
+        .navbar a:hover { color: var(--accent); }
+        .navbar a.active { color: var(--accent); }
+
+        .container { max-width: 1400px; margin: 20px auto; padding: 0 20px; }
+
+        .card {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid var(--hairline);
+        }
+
+        .btn {
+            background: var(--accent);
+            border: none;
+            color: var(--page);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .btn-secondary { background: #475569; color: #fff; }
+        /* Outlined rather than solid: a row of solid red buttons competes with
+           the status column, which is the actual data. The confirm dialog is
+           what guards the action, not the colour. */
+        .btn-danger {
+            background: transparent;
+            color: #fca5a5;
+            border: 1px solid var(--status-failed);
+        }
+        .btn-danger:hover:not(:disabled) { background: var(--status-failed); color: #fff; }
+        .btn:disabled { opacity: .5; cursor: not-allowed; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+        label.field { display: block; font-size: 12px; color: var(--ink-secondary); margin-bottom: 4px; }
+        input, select {
+            background: var(--surface-inset);
+            border: 1px solid var(--hairline);
+            padding: 8px 12px;
+            border-radius: 8px;
+            color: #fff;
+            width: 100%;
+            font-size: 13px;
+            font-family: inherit;
+        }
+
+        /* One filter row above everything it scopes. */
+        .filters {
+            display: flex;
+            gap: 14px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        .filters > div { min-width: 150px; flex: 1; }
+        .filters .divider {
+            width: 1px; min-width: 1px; flex: 0 0 1px;
+            align-self: stretch; background: var(--hairline);
+        }
+
+        /* ---- Figures ---- */
+        .hero-label { font-size: 13px; color: var(--ink-secondary); margin-bottom: 6px; }
+        .hero-value {
+            font-size: 52px;
+            font-weight: 600;
+            line-height: 1.05;
+            letter-spacing: -0.5px;
+            /* Proportional figures on purpose — tabular-nums reads loose at
+               display size. */
+        }
+        .hero-unit { font-size: 20px; color: var(--ink-secondary); font-weight: 600; margin-left: 6px; }
+        .hero-sub { font-size: 13px; color: var(--ink-muted); margin-top: 8px; }
+
+        .tiles { display: flex; gap: 14px; flex-wrap: wrap; }
+        .tile {
+            background: var(--surface-inset);
+            border: 1px solid var(--hairline);
+            border-radius: 12px;
+            padding: 14px 16px;
+            flex: 1;
+            min-width: 165px;
+        }
+        .tile-label { font-size: 12px; color: var(--ink-secondary); margin-bottom: 6px; }
+        .tile-value { font-size: 24px; font-weight: 600; }
+        .tile-note { font-size: 11px; color: var(--ink-muted); margin-top: 4px; }
+
+        .biz-row { display: flex; align-items: center; gap: 10px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 10px; display: inline-block; }
+
+        /* ---- Chart ---- */
+        .chart-head {
+            display: flex; justify-content: space-between;
+            align-items: flex-start; gap: 16px; flex-wrap: wrap;
+            margin-bottom: 4px;
+        }
+        .chart-title { font-size: 15px; font-weight: 600; }
+        .chart-sub { font-size: 12px; color: var(--ink-muted); margin-top: 3px; }
+        .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 14px 0 2px; }
+        .legend-item {
+            display: flex; align-items: center; gap: 7px;
+            font-size: 12px; color: var(--ink-secondary);
+            background: none; border: none; cursor: default; font-family: inherit;
+        }
+        #chartWrap { position: relative; }
+        #chartWrap svg { display: block; width: 100%; }
+        .tooltip {
+            position: absolute;
+            pointer-events: none;
+            background: #020617;
+            border: 1px solid var(--hairline);
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 12px;
+            min-width: 170px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+            opacity: 0;
+            transition: opacity .1s;
+            z-index: 20;
+        }
+        .tooltip.on { opacity: 1; }
+        .tooltip-day { font-weight: 600; margin-bottom: 7px; }
+        .tooltip-row { display: flex; align-items: center; gap: 7px; margin-top: 4px; }
+        .tooltip-row .amt { margin-left: auto; font-variant-numeric: tabular-nums; }
+        .tooltip-total {
+            display: flex; margin-top: 8px; padding-top: 7px;
+            border-top: 1px solid var(--hairline); font-weight: 600;
+        }
+        .tooltip-total .amt { margin-left: auto; font-variant-numeric: tabular-nums; }
+        .band-hit { fill: transparent; cursor: pointer; outline: none; }
+        .band-hit:focus-visible { fill: rgba(255, 255, 255, .06); }
+
+        /* ---- Tables ---- */
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--hairline); }
+        th {
+            font-size: 11px; text-transform: uppercase;
+            letter-spacing: .5px; color: var(--ink-muted); font-weight: 600;
+        }
+        tbody tr:hover { background: rgba(255, 255, 255, .025); }
+        td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; }
+
+        .badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 12px; white-space: nowrap;
+        }
+
+        .muted { color: var(--ink-muted); }
+        .empty { padding: 36px 10px; text-align: center; color: var(--ink-muted); font-size: 13px; }
+        .pager { display: flex; gap: 10px; align-items: center; justify-content: flex-end; margin-top: 14px; }
+        .err {
+            background: rgba(208, 59, 59, .12);
+            border: 1px solid var(--status-failed);
+            color: #fecaca;
+            padding: 12px 14px; border-radius: 10px;
+            font-size: 13px; margin-bottom: 20px; display: none;
+        }
+        .err.on { display: block; }
+        /* Hold the previous render while refetching — no skeleton flash, no
+           layout jump. */
+        .refetching { opacity: .45; transition: opacity .15s; }
+        .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+        h2.section { font-size: 15px; font-weight: 600; }
+    </style>
+</head>
+
+<body>
+    <div class="navbar">
+        <div><strong>🔷 Odaflux Portal</strong></div>
+        <div>
+            <a href="/context-builder">Context Builder</a>
+            <a href="/ocr">OCR</a>
+            <a href="/ugc-analysis">UGC Analysis</a>
+            <a href="/template-factory">Template Factory</a>
+            <a href="/gallery">Gallery</a>
+            <a href="/payments" class="active">Payments</a>
+            <a href="/admin/users">Users</a>
+            <a href="#" id="logoutBtn">Logout</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="err" id="err"></div>
+
+        <!-- One filter row, above everything it scopes. -->
+        <div class="card">
+            <div class="filters">
+                <div>
+                    <label class="field" for="fRange">Date range</label>
+                    <select id="fRange">
+                        <option value="7">Last 7 days</option>
+                        <option value="30" selected>Last 30 days</option>
+                        <option value="90">Last 90 days</option>
+                        <option value="365">Last 365 days</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="field" for="fApp">Business</label>
+                    <select id="fApp">
+                        <option value="">All businesses</option>
+                    </select>
+                </div>
+                <div class="divider" aria-hidden="true"></div>
+                <div>
+                    <label class="field" for="fStatus">Status <span class="muted">(list only)</span></label>
+                    <select id="fStatus">
+                        <option value="">Any status</option>
+                        <option value="pending">Pending</option>
+                        <option value="success">Success</option>
+                        <option value="failed">Failed</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="refunded">Refunded</option>
+                    </select>
+                </div>
+                <div style="flex: 2;">
+                    <label class="field" for="fSearch">Search <span class="muted">(list only)</span></label>
+                    <input id="fSearch" placeholder="tx_ref or customer id" autocomplete="off">
+                </div>
+            </div>
+        </div>
+
+        <!-- Exactly one hero figure per view. -->
+        <div class="card" id="heroCard">
+            <div class="hero-label">Net collected<span id="heroRange"></span></div>
+            <div class="hero-value" id="heroValue">—<span class="hero-unit">ETB</span></div>
+            <div class="hero-sub" id="heroSub"></div>
+        </div>
+
+        <div class="card">
+            <div class="tiles" id="tiles"></div>
+        </div>
+
+        <div class="card" id="chartCard">
+            <div class="chart-head">
+                <div>
+                    <div class="chart-title">Net collections by day</div>
+                    <div class="chart-sub" id="chartSub">Successful payments, bucketed by Ethiopian local day. Refunds are excluded.</div>
+                </div>
+                <button class="btn btn-secondary btn-sm" id="chartViewBtn">Table view</button>
+            </div>
+            <div class="legend" id="legend"></div>
+            <div id="chartWrap">
+                <div class="tooltip" id="tip" role="status" aria-live="polite"></div>
+            </div>
+            <div id="chartTable" style="display: none; margin-top: 10px; max-height: 340px; overflow: auto;"></div>
+        </div>
+
+        <div class="card">
+            <div class="toolbar">
+                <h2 class="section">By business</h2>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="appTable"></table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="toolbar">
+                <h2 class="section">Transactions</h2>
+                <span class="muted" style="font-size: 12px;" id="txnMeta"></span>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="txnTable"></table>
+            </div>
+            <div id="txnEmpty" class="empty" style="display: none;">No transactions match these filters.</div>
+            <div class="pager">
+                <button class="btn btn-secondary btn-sm" id="prevBtn">Previous</button>
+                <span class="muted" style="font-size: 12px;" id="pageLabel">Page 1</span>
+                <button class="btn btn-secondary btn-sm" id="nextBtn">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Same public anon-key client the other portal pages use. The anon key
+        // is safe in the page; every /api/payments/* call is admin-gated
+        // server-side against the session token.
+        const SB_URL = "https://vjcumvumnnvgncnbbtzk.supabase.co";
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqY3VtdnVtbm52Z25jbmJidHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5MjQwOTMsImV4cCI6MjA4MzUwMDA5M30.6YtPHl9EXnRNDtdUIMkNbLLyUvuk9hG3k1gHjn14qd4";
+        const sb = window.supabase.createClient(SB_URL, SB_KEY);
+
+        // Colour follows the entity, fixed for the life of the page.
+        const SERIES = {
+            odaflux:   getComputedStyle(document.documentElement).getPropertyValue('--series-odaflux').trim(),
+            shaleqa:   getComputedStyle(document.documentElement).getPropertyValue('--series-shaleqa').trim(),
+            ethiogram: getComputedStyle(document.documentElement).getPropertyValue('--series-ethiogram').trim(),
+            behalf:    getComputedStyle(document.documentElement).getPropertyValue('--series-behalf').trim(),
+        };
+        const SERIES_FALLBACK = '#64748b';
+        const colourFor = app => SERIES[app] || SERIES_FALLBACK;
+
+        const STATUS_META = {
+            success:   { colour: 'var(--status-success)',   label: 'Success',   icon: '✓' },
+            pending:   { colour: 'var(--status-pending)',   label: 'Pending',   icon: '◌' },
+            failed:    { colour: 'var(--status-failed)',    label: 'Failed',    icon: '✕' },
+            cancelled: { colour: 'var(--status-cancelled)', label: 'Cancelled', icon: '–' },
+            refunded:  { colour: 'var(--status-refunded)',  label: 'Refunded',  icon: '↩' },
+        };
+
+        const state = {
+            days: 30, app: '', status: '', search: '',
+            page: 1, perPage: 25,
+            summary: null, txns: null, hasNext: false,
+            chartAsTable: false,
+        };
+
+        // ---------- formatting ----------
+        const esc = s => String(s ?? '').replace(/[&<>"']/g, c => (
+            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+        ));
+        const fmt2 = n => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const fmt0 = n => Math.round(Number(n || 0)).toLocaleString('en-US');
+
+        function compact(n) {
+            const a = Math.abs(Number(n) || 0);
+            if (a >= 1e6) return (n / 1e6).toFixed(2).replace(/\.?0+$/, '') + 'M';
+            if (a >= 1e4) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
+            return fmt0(n);
+        }
+        function pct(v) { return v === null || v === undefined ? '—' : (v * 100).toFixed(1) + '%'; }
+
+        // One style per axis. compact() switches format at 10K, which would put
+        // "7,500" and "11.3K" on the same axis; this picks a single style for
+        // the whole axis from its maximum. Zero stays bare by convention.
+        function axisTick(v, useK) {
+            if (!useK) return fmt0(v);
+            if (v === 0) return '0';
+            const k = v / 1000;
+            return (Number.isInteger(k) ? String(k) : k.toFixed(1).replace(/\.0$/, '')) + 'K';
+        }
+        function shortDay(iso) {
+            const d = new Date(iso + 'T00:00:00');
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+        function stamp(iso) {
+            if (!iso) return '—';
+            return new Date(iso).toLocaleString('en-GB', {
+                day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+            });
+        }
+        function title(s) { return String(s || '').charAt(0).toUpperCase() + String(s || '').slice(1); }
+
+        function showErr(msg) {
+            const el = document.getElementById('err');
+            el.textContent = msg;
+            el.classList.add('on');
+        }
+        function clearErr() { document.getElementById('err').classList.remove('on'); }
+
+        async function getToken() {
+            const { data: { session } } = await sb.auth.getSession();
+            if (!session) { window.location.href = '/'; throw new Error('Not authenticated'); }
+            return session.access_token;
+        }
+
+        async function api(path, options = {}) {
+            const token = await getToken();
+            const resp = await fetch(path, {
+                ...options,
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+                    ...(options.headers || {}),
+                },
+            });
+            if (!resp.ok) {
+                let detail = await resp.text();
+                try { detail = JSON.parse(detail).detail ?? detail; } catch (_) { }
+                throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+            }
+            return resp.json();
+        }
+
+        // ---------- data ----------
+        async function loadAll({ keepPage = false } = {}) {
+            if (!keepPage) state.page = 1;
+            const main = document.querySelector('.container');
+            main.classList.add('refetching');
+            clearErr();
+            try {
+                const [summary, txns] = await Promise.all([loadSummary(), loadTxns()]);
+                state.summary = summary;
+                state.txns = txns.transactions;
+                state.hasNext = txns.has_next;
+                renderAll();
+            } catch (e) {
+                showErr(e.message || String(e));
+            } finally {
+                main.classList.remove('refetching');
+            }
+        }
+
+        function loadSummary() {
+            return api(`/api/payments/summary?days=${state.days}`);
+        }
+
+        function loadTxns() {
+            const p = new URLSearchParams({
+                days: state.days, page: state.page, per_page: state.perPage,
+            });
+            if (state.app) p.set('app_id', state.app);
+            if (state.status) p.set('status', state.status);
+            if (state.search) p.set('search', state.search);
+            return api(`/api/payments/transactions?${p}`);
+        }
+
+        // Businesses currently in scope. Filtering never changes anyone's colour.
+        function visibleApps() {
+            const all = state.summary?.apps || [];
+            return state.app ? all.filter(a => a === state.app) : all;
+        }
+
+        function scopedRows() {
+            const apps = visibleApps();
+            return (state.summary?.by_app || []).filter(r => apps.includes(r.app_id));
+        }
+
+        // ---------- render ----------
+        function renderAll() {
+            renderFilters();
+            renderHero();
+            renderTiles();
+            renderLegend();
+            renderChart();
+            renderAppTable();
+            renderTxnTable();
+        }
+
+        function renderFilters() {
+            const sel = document.getElementById('fApp');
+            const apps = state.summary?.apps || [];
+            if (sel.options.length <= 1 && apps.length) {
+                for (const a of apps) {
+                    const o = document.createElement('option');
+                    o.value = a; o.textContent = title(a);
+                    sel.appendChild(o);
+                }
+                sel.value = state.app;
+            }
+        }
+
+        function renderHero() {
+            const rows = scopedRows();
+            const collected = rows.reduce((s, r) => s + r.collected_etb, 0);
+            const n = state.summary?.window?.days ?? state.days;
+            document.getElementById('heroRange').textContent = ` · last ${n} days`;
+            document.getElementById('heroValue').innerHTML =
+                `${esc(compact(collected))}<span class="hero-unit">ETB</span>`;
+
+            const success = rows.reduce((s, r) => s + r.success_count, 0);
+            const scope = state.app ? title(state.app) : `${rows.length} businesses`;
+            document.getElementById('heroSub').textContent =
+                `${fmt2(collected)} ETB across ${fmt0(success)} successful payment${success === 1 ? '' : 's'} · ${scope}`;
+        }
+
+        function renderTiles() {
+            const rows = scopedRows();
+            const sum = k => rows.reduce((s, r) => s + (r[k] || 0), 0);
+            const settled = sum('success_count') + sum('failed_count') + sum('cancelled_count') + sum('refunded_count');
+            const won = sum('success_count') + sum('refunded_count');
+
+            const tiles = [
+                {
+                    label: 'Awaiting payment', value: compact(sum('pending_etb')) + ' ETB',
+                    note: `${fmt0(sum('pending_count'))} checkout${sum('pending_count') === 1 ? '' : 's'} still open`,
+                },
+                {
+                    label: 'Refunded', value: compact(sum('refunded_etb')) + ' ETB',
+                    note: `${fmt0(sum('refunded_count'))} transaction${sum('refunded_count') === 1 ? '' : 's'}`,
+                },
+                {
+                    label: 'Payment success rate',
+                    value: settled ? pct(won / settled) : '—',
+                    note: settled ? `${fmt0(won)} of ${fmt0(settled)} settled attempts` : 'No settled attempts yet',
+                },
+                {
+                    label: 'Failed or cancelled',
+                    value: fmt0(sum('failed_count') + sum('cancelled_count')),
+                    note: `out of ${fmt0(sum('attempts'))} attempt${sum('attempts') === 1 ? '' : 's'}`,
+                },
+            ];
+
+            document.getElementById('tiles').innerHTML = tiles.map(t => `
+                <div class="tile">
+                    <div class="tile-label">${esc(t.label)}</div>
+                    <div class="tile-value">${esc(t.value)}</div>
+                    <div class="tile-note">${esc(t.note)}</div>
+                </div>`).join('');
+        }
+
+        // A legend is always present for two or more series; identity is never
+        // colour alone. Text stays in ink tokens — only the dot is coloured.
+        function renderLegend() {
+            const apps = visibleApps();
+            const box = document.getElementById('legend');
+            if (apps.length < 2) { box.innerHTML = ''; return; }
+            box.innerHTML = apps.map(a => `
+                <span class="legend-item">
+                    <span class="dot" style="background:${colourFor(a)}"></span>${esc(title(a))}
+                </span>`).join('');
+        }
+
+        function niceMax(v) {
+            if (!(v > 0)) return 10;
+            const exp = Math.floor(Math.log10(v));
+            const base = Math.pow(10, exp);
+            for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 7.5, 10]) {
+                if (v <= m * base) return m * base;
+            }
+            return 10 * base;
+        }
+
+        // Rounded data-end at the top of the stack, square at the baseline.
+        function topSegPath(x, y, w, h, r) {
+            const rr = Math.max(0, Math.min(r, h, w / 2));
+            return `M${x},${y + rr}`
+                + `Q${x},${y} ${x + rr},${y}`
+                + `L${x + w - rr},${y}`
+                + `Q${x + w},${y} ${x + w},${y + rr}`
+                + `L${x + w},${y + h}L${x},${y + h}Z`;
+        }
+
+        function renderChart() {
+            const wrap = document.getElementById('chartWrap');
+            const tableBox = document.getElementById('chartTable');
+            const btn = document.getElementById('chartViewBtn');
+            const daily = state.summary?.daily || [];
+            const apps = visibleApps();
+
+            btn.textContent = state.chartAsTable ? 'Chart view' : 'Table view';
+            tableBox.style.display = state.chartAsTable ? 'block' : 'none';
+
+            if (state.chartAsTable) {
+                renderChartTable(daily, apps);
+                wrap.querySelectorAll('svg, .empty').forEach(n => n.remove());
+                return;
+            }
+            tableBox.innerHTML = '';
+
+            wrap.querySelectorAll('svg, .empty').forEach(n => n.remove());
+
+            const totals = daily.map(d => apps.reduce((s, a) => s + (d.by_app[a] || 0), 0));
+            const peak = Math.max(0, ...totals);
+            if (!daily.length || peak <= 0) {
+                const p = document.createElement('div');
+                p.className = 'empty';
+                p.textContent = 'No collections recorded in this window.';
+                wrap.appendChild(p);
+                return;
+            }
+
+            // Geometry. Height includes the x-axis band so the card never needs
+            // a nested scrollbar.
+            const padL = 62, padR = 8, padT = 10, plotH = 220, axisH = 26;
+            const width = Math.max(320, wrap.clientWidth || 900);
+            const plotW = width - padL - padR;
+            const height = padT + plotH + axisH;
+            const GAP = 2;                                  // the surface gap
+            const bandW = plotW / daily.length;
+            const barW = Math.max(1, Math.min(24, bandW - GAP));
+            const yMax = niceMax(peak);
+            const y = v => padT + plotH - (v / yMax) * plotH;
+            const compactAxis = yMax >= 10000;
+
+            const svgNS = 'http://www.w3.org/2000/svg';
+            const svg = document.createElementNS(svgNS, 'svg');
+            svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+            svg.setAttribute('height', String(height));
+            svg.setAttribute('role', 'img');
+            svg.setAttribute('aria-label',
+                `Net collections per day for ${apps.map(title).join(', ')} over the last ${state.days} days.`);
+
+            const el = (name, attrs, text) => {
+                const n = document.createElementNS(svgNS, name);
+                for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, String(v));
+                if (text !== undefined) n.textContent = text;
+                return n;
+            };
+
+            // Gridlines: solid hairlines, one step off the surface, recessive.
+            const TICKS = 4;
+            for (let i = 0; i <= TICKS; i++) {
+                const v = (yMax / TICKS) * i;
+                const gy = y(v);
+                svg.appendChild(el('line', {
+                    x1: padL, x2: padL + plotW, y1: gy, y2: gy,
+                    stroke: i === 0 ? 'var(--ink-muted)' : 'var(--hairline)',
+                    'stroke-width': 1, 'shape-rendering': 'crispEdges',
+                }));
+                svg.appendChild(el('text', {
+                    x: padL - 10, y: gy + 4, 'text-anchor': 'end',
+                    fill: 'var(--ink-muted)', 'font-size': 11,
+                    style: 'font-variant-numeric: tabular-nums',
+                }, axisTick(v, compactAxis)));
+            }
+
+            // Stacked columns.
+            const labelEvery = Math.max(1, Math.ceil(daily.length / 7));
+            daily.forEach((d, i) => {
+                const bx = padL + i * bandW + (bandW - barW) / 2;
+                const stack = apps
+                    .map(a => ({ app: a, value: d.by_app[a] || 0 }))
+                    .filter(s => s.value > 0);
+
+                let cursor = padT + plotH;                  // grows upward
+                stack.forEach((seg, idx) => {
+                    const isTop = idx === stack.length - 1;
+                    const raw = (seg.value / yMax) * plotH;
+                    // Reserve the 2px surface gap between touching segments.
+                    const h = Math.max(1, raw - (isTop ? 0 : GAP));
+                    const yTop = cursor - raw;
+                    const colour = colourFor(seg.app);
+                    if (isTop) {
+                        svg.appendChild(el('path', {
+                            d: topSegPath(bx, yTop, barW, h, 4), fill: colour,
+                        }));
+                    } else {
+                        svg.appendChild(el('rect', {
+                            x: bx, y: yTop + GAP, width: barW, height: h, fill: colour,
+                        }));
+                    }
+                    cursor = yTop;
+                });
+
+                // X-axis labels: selective, never one per bar.
+                if (i % labelEvery === 0 || i === daily.length - 1) {
+                    svg.appendChild(el('text', {
+                        x: bx + barW / 2, y: padT + plotH + 17, 'text-anchor': 'middle',
+                        fill: 'var(--ink-muted)', 'font-size': 11,
+                    }, shortDay(d.day)));
+                }
+
+                // Hit area spans the whole band, so the target is never the bar
+                // width. Focusable, so keyboard shows what hover shows.
+                const hit = el('rect', {
+                    class: 'band-hit', x: padL + i * bandW, y: padT,
+                    width: bandW, height: plotH, tabindex: 0,
+                    'aria-label': `${shortDay(d.day)}: ${fmt2(totals[i])} ETB`,
+                });
+                const show = () => showTip(d, apps, totals[i], padL + i * bandW + bandW / 2, wrap);
+                hit.addEventListener('mouseenter', show);
+                hit.addEventListener('focus', show);
+                hit.addEventListener('mouseleave', hideTip);
+                hit.addEventListener('blur', hideTip);
+                svg.appendChild(hit);
+            });
+
+            wrap.appendChild(svg);
+        }
+
+        function showTip(day, apps, total, cx, wrap) {
+            const tip = document.getElementById('tip');
+            const rows = apps
+                .map(a => ({ app: a, value: day.by_app[a] || 0 }))
+                .filter(r => r.value > 0)
+                .sort((a, b) => b.value - a.value);
+
+            tip.innerHTML = `
+                <div class="tooltip-day">${esc(shortDay(day.day))}</div>
+                ${rows.map(r => `
+                    <div class="tooltip-row">
+                        <span class="dot" style="background:${colourFor(r.app)}"></span>
+                        <span>${esc(title(r.app))}</span>
+                        <span class="amt">${esc(fmt2(r.value))}</span>
+                    </div>`).join('') || '<div class="muted">No collections</div>'}
+                <div class="tooltip-total"><span>Total ETB</span><span class="amt">${esc(fmt2(total))}</span></div>`;
+
+            tip.classList.add('on');
+            const w = tip.offsetWidth || 180;
+            const max = (wrap.clientWidth || 900) - w - 4;
+            tip.style.left = Math.max(4, Math.min(cx - w / 2, max)) + 'px';
+            tip.style.top = '0px';
+        }
+        function hideTip() { document.getElementById('tip').classList.remove('on'); }
+
+        // The chart's table-view twin — every plotted value reachable without
+        // hovering.
+        function renderChartTable(daily, apps) {
+            const box = document.getElementById('chartTable');
+            const head = `<tr><th>Day</th>${apps.map(a => `<th class="num">${esc(title(a))}</th>`).join('')}<th class="num">Total</th></tr>`;
+            const body = daily.map(d => {
+                const total = apps.reduce((s, a) => s + (d.by_app[a] || 0), 0);
+                return `<tr><td>${esc(shortDay(d.day))}</td>${apps.map(a =>
+                    `<td class="num">${esc(fmt2(d.by_app[a] || 0))}</td>`).join('')
+                    }<td class="num"><strong>${esc(fmt2(total))}</strong></td></tr>`;
+            }).join('');
+            box.innerHTML = `<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
+        }
+
+        function renderAppTable() {
+            const rows = scopedRows();
+            const head = `<tr>
+                <th>Business</th><th class="num">Collected (ETB)</th>
+                <th class="num">Pending (ETB)</th><th class="num">Refunded (ETB)</th>
+                <th class="num">Success rate</th><th class="num">Attempts</th></tr>`;
+            const body = rows.length ? rows.map(r => `
+                <tr>
+                    <td><span class="biz-row"><span class="dot" style="background:${colourFor(r.app_id)}"></span>${esc(title(r.app_id))}</span></td>
+                    <td class="num">${esc(fmt2(r.collected_etb))}</td>
+                    <td class="num">${esc(fmt2(r.pending_etb))}</td>
+                    <td class="num">${esc(fmt2(r.refunded_etb))}</td>
+                    <td class="num">${esc(pct(r.success_rate))}</td>
+                    <td class="num">${esc(fmt0(r.attempts))}</td>
+                </tr>`).join('')
+                : `<tr><td colspan="6" class="empty">No activity in this window.</td></tr>`;
+            document.getElementById('appTable').innerHTML = `<thead>${head}</thead><tbody>${body}</tbody>`;
+        }
+
+        function badge(status) {
+            const m = STATUS_META[status] || { colour: 'var(--ink-muted)', label: title(status), icon: '•' };
+            // Icon + text label, never colour alone. The icon is the coloured
+            // mark, so no separate dot — that was saying the same thing twice.
+            return `<span class="badge"><span aria-hidden="true" style="color:${m.colour};font-weight:700">${m.icon}</span>${esc(m.label)}</span>`;
+        }
+
+        function renderTxnTable() {
+            const rows = state.txns || [];
+            document.getElementById('txnEmpty').style.display = rows.length ? 'none' : 'block';
+            document.getElementById('pageLabel').textContent = `Page ${state.page}`;
+            document.getElementById('prevBtn').disabled = state.page <= 1;
+            document.getElementById('nextBtn').disabled = !state.hasNext;
+            document.getElementById('txnMeta').textContent =
+                rows.length ? `${rows.length} shown` : '';
+
+            if (!rows.length) {
+                document.getElementById('txnTable').innerHTML = '';
+                return;
+            }
+
+            const head = `<tr>
+                <th>Reference</th><th>Business</th><th>Customer</th>
+                <th class="num">Amount (ETB)</th><th>Status</th>
+                <th>Created</th><th></th></tr>`;
+
+            const body = rows.map(t => {
+                const actions = [];
+                if (t.status === 'pending') {
+                    actions.push(`<button class="btn btn-secondary btn-sm" data-act="reverify" data-ref="${esc(t.tx_ref)}">Re-verify</button>`);
+                }
+                if (t.status === 'success') {
+                    actions.push(`<button class="btn btn-danger btn-sm" data-act="refund" data-ref="${esc(t.tx_ref)}" data-amt="${esc(t.amount_etb)}">Refund</button>`);
+                }
+                return `<tr>
+                    <td class="mono" title="${esc(t.tx_ref)}">${esc(t.tx_ref)}</td>
+                    <td><span class="biz-row"><span class="dot" style="background:${colourFor(t.app_id)}"></span>${esc(title(t.app_id))}</span></td>
+                    <td class="mono">${esc(t.external_user_id)}</td>
+                    <td class="num">${esc(fmt2(t.amount_etb))}</td>
+                    <td>${badge(t.status)}${t.failure_reason ? `<div class="muted" style="font-size:11px">${esc(t.failure_reason)}</div>` : ''}</td>
+                    <td class="muted" style="font-variant-numeric: tabular-nums">${esc(stamp(t.created_at))}</td>
+                    <td style="white-space:nowrap">${actions.join(' ')}</td>
+                </tr>`;
+            }).join('');
+
+            document.getElementById('txnTable').innerHTML = `<thead>${head}</thead><tbody>${body}</tbody>`;
+        }
+
+        // ---------- actions ----------
+        async function reverify(ref, btn) {
+            btn.disabled = true;
+            btn.textContent = 'Checking…';
+            try {
+                const r = await api(`/api/payments/transactions/${encodeURIComponent(ref)}/reverify`, { method: 'POST' });
+                if (!r.changed) showErr(`${ref} is still ${r.status} at Chapa.`);
+                await loadAll({ keepPage: true });
+            } catch (e) {
+                showErr(e.message || String(e));
+                btn.disabled = false;
+                btn.textContent = 'Re-verify';
+            }
+        }
+
+        async function refund(ref, amount, btn) {
+            // Refunds move real money, so they are confirmed explicitly and the
+            // amount is spelled out.
+            const ok = window.confirm(
+                `Refund ${fmt2(amount)} ETB for ${ref}?\n\n`
+                + `This asks Chapa to return the money to the customer and cannot be undone from this dashboard.`
+            );
+            if (!ok) return;
+            btn.disabled = true;
+            btn.textContent = 'Refunding…';
+            try {
+                await api(`/api/payments/transactions/${encodeURIComponent(ref)}/refund`, {
+                    method: 'POST', body: JSON.stringify({}),
+                });
+                await loadAll({ keepPage: true });
+            } catch (e) {
+                showErr(e.message || String(e));
+                btn.disabled = false;
+                btn.textContent = 'Refund';
+            }
+        }
+
+        document.getElementById('txnTable').addEventListener('click', e => {
+            const btn = e.target.closest('button[data-act]');
+            if (!btn) return;
+            const { act, ref, amt } = btn.dataset;
+            if (act === 'reverify') reverify(ref, btn);
+            if (act === 'refund') refund(ref, Number(amt), btn);
+        });
+
+        // ---------- wiring ----------
+        let searchTimer = null;
+        document.getElementById('fRange').addEventListener('change', e => {
+            state.days = Number(e.target.value); loadAll();
+        });
+        document.getElementById('fApp').addEventListener('change', e => {
+            state.app = e.target.value; loadAll();
+        });
+        document.getElementById('fStatus').addEventListener('change', e => {
+            state.status = e.target.value; loadAll();
+        });
+        document.getElementById('fSearch').addEventListener('input', e => {
+            clearTimeout(searchTimer);
+            const v = e.target.value.trim();
+            searchTimer = setTimeout(() => { state.search = v; loadAll(); }, 350);
+        });
+        document.getElementById('prevBtn').addEventListener('click', () => {
+            if (state.page > 1) { state.page--; loadAll({ keepPage: true }); }
+        });
+        document.getElementById('nextBtn').addEventListener('click', () => {
+            if (state.hasNext) { state.page++; loadAll({ keepPage: true }); }
+        });
+        document.getElementById('chartViewBtn').addEventListener('click', () => {
+            state.chartAsTable = !state.chartAsTable;
+            renderChart();
+        });
+        document.getElementById('logoutBtn').addEventListener('click', async e => {
+            e.preventDefault();
+            await sb.auth.signOut();
+            window.location.href = '/';
+        });
+
+        let resizeTimer = null;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => { if (state.summary) renderChart(); }, 150);
+        });
+
+        loadAll();
+    </script>
+</body>
+
+</html>
