@@ -50,7 +50,7 @@ DEFAULT_APPS = [
         "name": "System Backend",
         "api_key": "chp_live_sys_backend_9c8a143f5d2b",
         "webhook_secret": "whsec_live_sys_backend_e4b1029c",
-        "webhook_url": "https://system-backend-1045664496839.us-central1.run.app/api/v1/payments/callback",
+        "webhook_url": "https://systembackendservice-ebjq5oaqna-uc.a.run.app/api/v1/payments/callback",
         "description": "Internal business workflows & vendor settlements",
         "is_active": True
     }
@@ -319,7 +319,8 @@ async def handle_chapa_webhook(payload: Dict[str, Any], signature: Optional[str]
                     "Content-Type": "application/json",
                     "X-Portal-Signature": signature,
                     "X-Portal-App-Id": app_id,
-                    "X-Portal-Forward": "true"
+                    "X-Portal-Forward": "true",
+                    "X-Webhook-Secret": secret
                 }
 
                 try:
