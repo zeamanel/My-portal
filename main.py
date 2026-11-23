@@ -894,16 +894,19 @@ async def admin_get_apps(admin=Depends(admin_required)):
 
 @app.post("/api/admin/payments/apps")
 async def admin_register_app(request: Request, admin=Depends(admin_required)):
+    """Register a new business. Returns its generated X-App-Key and webhook secret."""
     body = await request.json()
-    name = body.get("name")
-    if not name:
-        raise HTTPException(400, "App name required")
-    app_data = payment_gateway.register_client_app(
-        name=name,
-        app_id=body.get("app_id"),
-        webhook_url=body.get("webhook_url", ""),
-        description=body.get("description", "")
-    )
+    if not isinstance(body, dict):
+        raise HTTPException(400, "JSON object required")
+    try:
+        app_data = payment_gateway.register_client_app(
+            name=str(body.get("name") or ""),
+            app_id=str(body.get("app_id") or ""),
+            webhook_url=str(body.get("webhook_url") or ""),
+            description=str(body.get("description") or ""),
+        )
+    except Exception as e:
+        raise _gateway_http_error(e)
     return {"app": app_data}
 
 @app.post("/api/admin/payments/apps/{app_id}/rotate")

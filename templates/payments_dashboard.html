@@ -273,7 +273,7 @@
 </div>
 
 <div class="subtabs">
-    <button class="subtab-btn active" onclick="showSubTab('appsTab', this)"><i class="fas fa-key"></i> Connected Webapps (4)</button>
+    <button class="subtab-btn active" onclick="showSubTab('appsTab', this)"><i class="fas fa-key"></i> <span id="appsTabLabel">Connected Webapps</span></button>
     <button class="subtab-btn" onclick="showSubTab('txTab', this)"><i class="fas fa-list-check"></i> Live Transactions</button>
     <button class="subtab-btn" onclick="showSubTab('simulatorTab', this)"><i class="fas fa-vial"></i> Checkout Simulator</button>
 </div>
@@ -283,8 +283,42 @@
     <div class="panel-card">
         <h2>
             <span>Registered Client Webapps</span>
-            <span style="font-size: 12px; font-weight: normal; color: #94a3b8;">Webapps authenticate via header: <code>X-App-Key</code></span>
+            <span style="display: flex; align-items: center; gap: 14px;">
+                <span style="font-size: 12px; font-weight: normal; color: #94a3b8;">Webapps authenticate via header: <code>X-App-Key</code></span>
+                <button type="button" id="addAppBtn" class="btn-action btn-primary" onclick="toggleAddApp(true)"><i class="fas fa-plus"></i> Add business</button>
+            </span>
         </h2>
+
+        <form id="addAppForm" onsubmit="handleAddApp(event)" style="display: none; background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 16px; margin-bottom: 18px;">
+            <div style="font-weight: 700; margin-bottom: 12px;">New business</div>
+            <div class="test-form">
+                <div>
+                    <label for="newAppName" style="font-size: 11px; color: #94a3b8; font-weight: 600;">Business name *</label>
+                    <input type="text" id="newAppName" maxlength="80" required placeholder="e.g. Addis Coffee">
+                </div>
+                <div>
+                    <label for="newAppId" style="font-size: 11px; color: #94a3b8; font-weight: 600;">App ID</label>
+                    <input type="text" id="newAppId" maxlength="40" placeholder="addis-coffee" pattern="[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?" title="Lowercase letters, digits and hyphens">
+                    <small class="platform-sub">Permanent. Prefixes every tx_ref. Leave blank to derive from the name.</small>
+                </div>
+                <div>
+                    <label for="newAppWebhook" style="font-size: 11px; color: #94a3b8; font-weight: 600;">Webhook URL</label>
+                    <input type="url" id="newAppWebhook" maxlength="500" placeholder="https://api.example.com/payments/callback">
+                    <small class="platform-sub">Where confirmed payments are forwarded. Optional, https only.</small>
+                </div>
+                <div>
+                    <label for="newAppDesc" style="font-size: 11px; color: #94a3b8; font-weight: 600;">Description</label>
+                    <input type="text" id="newAppDesc" maxlength="300" placeholder="What this business charges for">
+                </div>
+            </div>
+            <div style="margin-top: 14px; display: flex; gap: 10px; align-items: center;">
+                <button type="submit" id="addAppSubmit" class="btn-action btn-primary"><i class="fas fa-check"></i> Create business</button>
+                <button type="button" class="btn-action btn-outline" onclick="toggleAddApp(false)">Cancel</button>
+                <span id="addAppStatus" style="font-size: 13px;"></span>
+            </div>
+        </form>
+
+        <div id="newAppCreds" style="display: none; background: #0f172a; border: 1px solid #0284c7; border-radius: 10px; padding: 16px; margin-bottom: 18px;"></div>
         <div style="overflow-x: auto;">
             <table>
                 <thead>
@@ -346,10 +380,7 @@
                 <div>
                     <label style="font-size: 11px; color: #94a3b8; font-weight: 600;">Client Webapp</label>
                     <select id="simAppId" required>
-                        <option value="musa-ai">Musa AI / Odaflux</option>
-                        <option value="ethiogram">Ethiogram</option>
-                        <option value="shaleqa">Shaleqa</option>
-                        <option value="system-backend">System Backend</option>
+                        <option value="">Loading…</option>
                     </select>
                 </div>
                 <div>
@@ -498,6 +529,99 @@
         if (el.dataset.action === 'verify') verifyTx(v);
     });
 
+    // The tab count and the simulator's platform list come from the registry,
+    // so a newly added business shows up everywhere without editing the page.
+    function renderAppPickers(apps) {
+        // One text node: the tab is a flex container, so a separate count
+        // element would be spaced apart from its parentheses.
+        document.getElementById('appsTabLabel').textContent = `Connected Webapps (${apps.length})`;
+        const sel = document.getElementById('simAppId');
+        const current = sel.value;
+        sel.innerHTML = apps
+            .slice()
+            .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+            .map(a => `<option value="${esc(a.app_id)}">${esc(a.name)}</option>`)
+            .join('') || '<option value="">No businesses registered</option>';
+        if (apps.some(a => a.app_id === current)) sel.value = current;
+    }
+
+    function slugify(name) {
+        return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '');
+    }
+
+    let appIdTouched = false;
+    function toggleAddApp(show) {
+        const form = document.getElementById('addAppForm');
+        form.style.display = show ? 'block' : 'none';
+        document.getElementById('addAppBtn').style.display = show ? 'none' : '';
+        if (show) {
+            form.reset();
+            appIdTouched = false;
+            document.getElementById('addAppStatus').textContent = '';
+            document.getElementById('newAppCreds').style.display = 'none';
+            document.getElementById('newAppName').focus();
+        }
+    }
+
+    // Suggest an app_id from the name until the admin types their own.
+    document.addEventListener('input', e => {
+        if (e.target.id === 'newAppId') appIdTouched = e.target.value.trim() !== '';
+        if (e.target.id === 'newAppName' && !appIdTouched) {
+            document.getElementById('newAppId').value = slugify(e.target.value);
+        }
+    });
+
+    async function handleAddApp(e) {
+        e.preventDefault();
+        const btn = document.getElementById('addAppSubmit');
+        const statusEl = document.getElementById('addAppStatus');
+        btn.disabled = true;
+        statusEl.textContent = 'Creating…';
+        statusEl.style.color = '#94a3b8';
+        try {
+            const token = window.getAuthToken();
+            const res = await fetch('/api/admin/payments/apps', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({
+                    name: document.getElementById('newAppName').value.trim(),
+                    app_id: document.getElementById('newAppId').value.trim(),
+                    webhook_url: document.getElementById('newAppWebhook').value.trim(),
+                    description: document.getElementById('newAppDesc').value.trim(),
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.detail || 'Could not create business');
+            toggleAddApp(false);
+            showNewAppCreds(data.app);
+            await Promise.all([loadApps(), loadStats()]);
+        } catch (err) {
+            statusEl.textContent = err.message;
+            statusEl.style.color = '#f87171';
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    function showNewAppCreds(app) {
+        const box = document.getElementById('newAppCreds');
+        box.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <strong style="color: #38bdf8;"><i class="fas fa-circle-check"></i> ${esc(app.name)} added as <code>${esc(app.app_id)}</code></strong>
+                <button type="button" class="btn-action btn-outline" onclick="document.getElementById('newAppCreds').style.display='none'">Done</button>
+            </div>
+            <p class="platform-sub" style="margin-bottom: 10px;">Put these in the new business's server config. It sends the key as <code>X-App-Key</code> when starting a payment, and checks <code>X-Portal-Signature</code> on forwarded webhooks with the secret.</p>
+            <div style="margin-bottom: 6px;"><span class="platform-sub">API KEY (X-App-Key)</span><br>
+                <span class="key-box"><span>${esc(app.api_key)}</span>
+                <button class="copy-btn" data-action="copy" data-value="${esc(app.api_key)}" title="Copy key"><i class="fas fa-copy"></i></button></span></div>
+            <div><span class="platform-sub">WEBHOOK SECRET (HMAC)</span><br>
+                <span class="key-box" style="color: #a78bfa;"><span>${esc(app.webhook_secret)}</span>
+                <button class="copy-btn" data-action="copy" data-value="${esc(app.webhook_secret)}" title="Copy secret"><i class="fas fa-copy"></i></button></span></div>
+            ${app.webhook_url ? '' : '<p class="platform-sub" style="margin-top: 10px; color: #fdba74;">No webhook URL set: payments will complete, but this business will not be notified. It can still poll the verify endpoint.</p>'}`;
+        box.style.display = 'block';
+        box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
     async function loadApps() {
         try {
             const token = window.getAuthToken();
@@ -505,6 +629,7 @@
             if (!res.ok) return;
             const data = await res.json();
             const tbody = document.getElementById('appsTableBody');
+            renderAppPickers(data.apps || []);
             tbody.innerHTML = (data.apps || []).map(a => `
                 <tr>
                     <td><strong>${esc(a.name)}</strong><br><small style="color: #94a3b8;">${esc(a.description)}</small></td>

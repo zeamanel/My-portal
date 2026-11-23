@@ -8,6 +8,7 @@ import logging
 import datetime
 import secrets
 from typing import Optional, Dict, Any, List, Iterable, Tuple
+from urllib.parse import urlparse
 import httpx
 from google.cloud import firestore
 from google.api_core.exceptions import AlreadyExists
@@ -144,23 +145,61 @@ def list_client_apps() -> List[Dict[str, Any]]:
     return [{"id": d.id, **d.to_dict()} for d in docs]
 
 
-def register_client_app(name: str, app_id: Optional[str] = None, webhook_url: str = "", description: str = "") -> Dict[str, Any]:
-    """Register or update a client app with a unique API key."""
-    db = get_firestore_client()
-    if not app_id:
-        app_id = name.lower().replace(" ", "-").replace("/", "-")
-        app_id = "".join([c for c in app_id if c.isalnum() or c == "-"])
+APP_ID_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$")
 
+
+def slugify_app_id(name: str) -> str:
+    """'Addis Coffee / Shop' -> 'addis-coffee-shop'."""
+    slug = re.sub(r"[^a-z0-9]+", "-", (name or "").lower()).strip("-")
+    return slug[:40].rstrip("-")
+
+
+def _validate_webhook_url(url: str) -> str:
+    url = (url or "").strip()
+    if not url:
+        return ""
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise GatewayError(400, "webhook_url must be an https:// URL")
+    if len(url) > 500:
+        raise GatewayError(400, "webhook_url is too long (max 500 characters)")
+    return url
+
+
+def register_client_app(name: str, app_id: Optional[str] = None, webhook_url: str = "", description: str = "") -> Dict[str, Any]:
+    """Register a NEW client app with freshly generated credentials.
+
+    Refuses an app_id that already exists. The previous version used set(),
+    so "registering" an existing id silently replaced that platform's API key
+    and webhook secret (breaking its payments) and wiped its settings. To
+    change an existing platform's keys, use rotate_app_credentials().
+    """
+    name = (name or "").strip()
+    if not name:
+        raise GatewayError(400, "Business name required")
+    if len(name) > 80:
+        raise GatewayError(400, "Business name is too long (max 80 characters)")
+
+    app_id = (app_id or "").strip().lower() or slugify_app_id(name)
+    if not APP_ID_PATTERN.match(app_id):
+        raise GatewayError(400, "app_id must be 1-40 lowercase letters, digits or hyphens, "
+                                "and cannot start or end with a hyphen")
+
+    description = (description or "").strip()[:300]
     data = {
         "app_id": app_id,
         "name": name,
         **_new_credentials(app_id),
-        "webhook_url": webhook_url,
+        "webhook_url": _validate_webhook_url(webhook_url),
         "description": description,
         "is_active": True,
         "created_at": _now()
     }
-    db.collection("payment_apps").document(app_id).set(data)
+    try:
+        get_firestore_client().collection("payment_apps").document(app_id).create(data)
+    except AlreadyExists:
+        raise GatewayError(409, f"A business with app_id '{app_id}' already exists")
+    logger.info("Registered client app %s", app_id)
     return data
 
 
