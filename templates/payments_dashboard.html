@@ -189,6 +189,20 @@
         font-size: 13px;
         width: 100%;
     }
+    .badge-review { background: rgba(251, 146, 60, 0.2); color: #fdba74; border: 1px solid rgba(251, 146, 60, 0.4); }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .platform-sub { font-size: 11px; color: #64748b; }
+    .range-select {
+        background: #0f172a;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        padding: 6px 10px;
+        color: #f8fafc;
+        font-size: 12px;
+        /* base.html gives every select width:100%; keep this one compact. */
+        width: auto;
+        flex: 0 0 auto;
+    }
 </style>
 
 <div class="payments-header">
@@ -222,6 +236,40 @@
         <div class="value" id="statAppsCount">4 Apps</div>
         <i class="fas fa-network-wired icon-bg"></i>
     </div>
+</div>
+
+<div class="panel-card">
+    <h2>
+        <span>Payments by Platform</span>
+        <select id="statsRange" class="range-select" onchange="loadStats()" aria-label="Date range">
+            <option value="">All time</option>
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
+        </select>
+    </h2>
+    <div style="overflow-x: auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Platform</th>
+                    <th class="num">Collected (ETB)</th>
+                    <th class="num">Pending (ETB)</th>
+                    <th class="num">Completed</th>
+                    <th class="num">Pending</th>
+                    <th class="num">Failed</th>
+                    <th class="num">Needs review</th>
+                    <th class="num">Completed rate</th>
+                </tr>
+            </thead>
+            <tbody id="platformTableBody">
+                <tr><td colspan="8" style="text-align: center; color: #94a3b8;">Loading per-platform totals...</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p class="platform-sub" style="margin-top: 10px;">
+        Completed rate counts every attempt, including checkouts still pending. "Needs review" means Chapa reported success but the amount or currency did not match the order.
+    </p>
 </div>
 
 <div class="subtabs">
@@ -340,6 +388,25 @@
         btn.classList.add('active');
     }
 
+    // Everything rendered from the API passes through esc(). Emails, user ids
+    // and tx_refs come from client platforms and their customers; rendered raw,
+    // any of them could run script in this admin page and read the token.
+    function esc(value) {
+        return String(value ?? '').replace(/[&<>"']/g, c => (
+            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+        ));
+    }
+    const fmtEtb = n => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtInt = n => Number(n || 0).toLocaleString('en-US');
+
+    function statusBadge(status) {
+        const cls = status === 'completed' ? 'badge-success'
+            : status === 'pending' ? 'badge-pending'
+            : status === 'needs_review' ? 'badge-review'
+            : 'badge-failed';
+        return `<span class="badge ${cls}">${esc(status)}</span>`;
+    }
+
     function copyToClipboard(text, btn) {
         navigator.clipboard.writeText(text);
         const orig = btn.innerHTML;
@@ -354,17 +421,82 @@
     async function loadStats() {
         try {
             const token = window.getAuthToken();
-            const res = await fetch('/api/admin/payments/stats', { headers: { 'Authorization': 'Bearer ' + token } });
+            const days = document.getElementById('statsRange').value;
+            const url = '/api/admin/payments/stats' + (days ? '?days=' + encodeURIComponent(days) : '');
+            const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
             if (!res.ok) return;
             const data = await res.json();
-            document.getElementById('statTotalEtb').textContent = (data.total_volume_etb || 0).toLocaleString() + ' ETB';
-            document.getElementById('statTotalTx').textContent = data.total_transactions || 0;
+            document.getElementById('statTotalEtb').textContent = fmtEtb(data.total_volume_etb) + ' ETB';
+            document.getElementById('statTotalTx').textContent = fmtInt(data.total_transactions);
             document.getElementById('statSuccessRate').textContent = data.success_rate || '100%';
-            document.getElementById('statAppsCount').textContent = (data.apps_count || 4) + ' Apps';
+            document.getElementById('statAppsCount').textContent = (data.apps_count || 0) + ' Apps';
+            renderPlatforms(data.by_app || []);
         } catch (e) {
             console.error('Failed to load stats', e);
         }
     }
+
+    function renderPlatforms(rows) {
+        const tbody = document.getElementById('platformTableBody');
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #94a3b8;">No platforms registered</td></tr>';
+            return;
+        }
+        const total = k => rows.reduce((s, r) => s + Number(r[k] || 0), 0);
+        const body = rows.map(r => `
+            <tr>
+                <td><strong>${esc(r.name)}</strong><br><span class="badge badge-app">${esc(r.app_id)}</span></td>
+                <td class="num"><strong>${fmtEtb(r.completed_etb)}</strong></td>
+                <td class="num">${fmtEtb(r.pending_etb)}</td>
+                <td class="num">${fmtInt(r.completed_count)}</td>
+                <td class="num">${fmtInt(r.pending_count)}</td>
+                <td class="num">${fmtInt(r.failed_count)}</td>
+                <td class="num">${r.needs_review_count ? `<span class="badge badge-review">${fmtInt(r.needs_review_count)}</span>` : '0'}</td>
+                <td class="num">${esc(r.success_rate || '—')}</td>
+            </tr>`).join('');
+        const completed = total('completed_count');
+        const attempts = total('total_transactions');
+        const foot = `
+            <tr style="border-top: 2px solid #334155;">
+                <td><strong>All platforms</strong></td>
+                <td class="num"><strong>${fmtEtb(total('completed_etb'))}</strong></td>
+                <td class="num">${fmtEtb(total('pending_etb'))}</td>
+                <td class="num">${fmtInt(completed)}</td>
+                <td class="num">${fmtInt(total('pending_count'))}</td>
+                <td class="num">${fmtInt(total('failed_count'))}</td>
+                <td class="num">${fmtInt(total('needs_review_count'))}</td>
+                <td class="num">${attempts ? (completed / attempts * 100).toFixed(1) + '%' : '—'}</td>
+            </tr>`;
+        tbody.innerHTML = body + foot;
+    }
+
+    async function rotateKeys(appId) {
+        if (!confirm(`Rotate the API key and webhook secret for ${appId}?\n\nThe current ones stop working immediately. ${appId} will fail to start payments, and will reject forwarded webhooks, until it is updated with the new values.`)) return;
+        try {
+            const token = window.getAuthToken();
+            const res = await fetch('/api/admin/payments/apps/' + encodeURIComponent(appId) + '/rotate', {
+                method: 'POST', headers: { 'Authorization': 'Bearer ' + token }
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Rotation failed');
+            alert(`New credentials for ${appId} are shown in the table. Copy them into ${appId}'s configuration now.`);
+            loadApps();
+        } catch (e) {
+            alert('Rotation failed: ' + e.message);
+        }
+    }
+
+    // One delegated handler instead of onclick="fn('${value}')" strings, which
+    // break (or execute) when a value contains a quote.
+    document.addEventListener('click', e => {
+        const el = e.target.closest('[data-action]');
+        if (!el) return;
+        const v = el.dataset.value;
+        if (el.dataset.action === 'copy') copyToClipboard(v, el);
+        if (el.dataset.action === 'test') testSimForApp(v);
+        if (el.dataset.action === 'rotate') rotateKeys(v);
+        if (el.dataset.action === 'verify') verifyTx(v);
+    });
 
     async function loadApps() {
         try {
@@ -375,28 +507,30 @@
             const tbody = document.getElementById('appsTableBody');
             tbody.innerHTML = (data.apps || []).map(a => `
                 <tr>
-                    <td><strong>${a.name}</strong><br><small style="color: #94a3b8;">${a.description || ''}</small></td>
-                    <td><span class="badge badge-app">${a.app_id}</span></td>
+                    <td><strong>${esc(a.name)}</strong><br><small style="color: #94a3b8;">${esc(a.description)}</small></td>
+                    <td><span class="badge badge-app">${esc(a.app_id)}</span></td>
                     <td>
                         <div style="margin-bottom: 6px;">
                             <span style="font-size: 10px; color: #64748b; font-weight: 600;">API KEY (X-App-Key)</span><br>
                             <span class="key-box">
-                                <span>${a.api_key}</span>
-                                <button class="copy-btn" onclick="copyToClipboard('${a.api_key}', this)" title="Copy Key"><i class="fas fa-copy"></i></button>
+                                <span>${esc(a.api_key)}</span>
+                                <button class="copy-btn" data-action="copy" data-value="${esc(a.api_key)}" title="Copy Key"><i class="fas fa-copy"></i></button>
                             </span>
                         </div>
                         <div>
                             <span style="font-size: 10px; color: #64748b; font-weight: 600;">WEBHOOK SECRET (HMAC)</span><br>
                             <span class="key-box" style="color: #a78bfa;">
-                                <span>${a.webhook_secret || 'whsec_' + a.app_id}</span>
-                                <button class="copy-btn" onclick="copyToClipboard('${a.webhook_secret}', this)" title="Copy Secret"><i class="fas fa-copy"></i></button>
+                                <span>${esc(a.webhook_secret || 'not set')}</span>
+                                <button class="copy-btn" data-action="copy" data-value="${esc(a.webhook_secret)}" title="Copy Secret"><i class="fas fa-copy"></i></button>
                             </span>
                         </div>
+                        ${a.credentials_rotated_at ? `<small style="color: #64748b;">Rotated ${esc(new Date(a.credentials_rotated_at).toLocaleString())}</small>` : ''}
                     </td>
-                    <td style="font-family: monospace; font-size: 11px; color: #94a3b8;">${a.webhook_url || 'None configured'}</td>
+                    <td style="font-family: monospace; font-size: 11px; color: #94a3b8;">${esc(a.webhook_url || 'None configured')}</td>
                     <td><span class="badge ${a.is_active ? 'badge-success' : 'badge-failed'}">${a.is_active ? 'Active' : 'Disabled'}</span></td>
-                    <td>
-                        <button class="btn-action btn-outline" onclick="testSimForApp('${a.app_id}')"><i class="fas fa-bolt"></i> Test</button>
+                    <td style="white-space: nowrap;">
+                        <button class="btn-action btn-outline" data-action="test" data-value="${esc(a.app_id)}"><i class="fas fa-bolt"></i> Test</button>
+                        <button class="btn-action btn-outline" data-action="rotate" data-value="${esc(a.app_id)}"><i class="fas fa-key"></i> Rotate keys</button>
                     </td>
                 </tr>
             `).join('');
@@ -417,18 +551,17 @@
                 return;
             }
             tbody.innerHTML = data.transactions.map(tx => {
-                const badgeClass = tx.status === 'completed' ? 'badge-success' : (tx.status === 'pending' ? 'badge-pending' : 'badge-failed');
                 const dateStr = tx.created_at ? new Date(tx.created_at).toLocaleString() : '-';
                 return `
                     <tr>
-                        <td style="font-size: 11px; color: #94a3b8;">${dateStr}</td>
-                        <td><span class="badge badge-app">${tx.app_id || 'general'}</span></td>
-                        <td style="font-family: monospace; font-size: 12px;">${tx.tx_ref}</td>
-                        <td><strong>${(tx.amount_etb || 0).toLocaleString()} ETB</strong></td>
-                        <td>${tx.email || tx.user_id || 'Anon'}</td>
-                        <td><span class="badge ${badgeClass}">${tx.status}</span></td>
+                        <td style="font-size: 11px; color: #94a3b8;">${esc(dateStr)}</td>
+                        <td><span class="badge badge-app">${esc(tx.app_id || 'general')}</span></td>
+                        <td style="font-family: monospace; font-size: 12px;">${esc(tx.tx_ref)}</td>
+                        <td><strong>${fmtEtb(tx.amount_etb)} ETB</strong></td>
+                        <td>${esc(tx.email || tx.user_id || 'Anon')}</td>
+                        <td>${statusBadge(tx.status)}${tx.error ? `<br><small style="color: #94a3b8;">${esc(tx.error)}</small>` : ''}</td>
                         <td>
-                            <button class="btn-action btn-outline" onclick="verifyTx('${tx.tx_ref}')"><i class="fas fa-arrows-rotate"></i> Verify</button>
+                            <button class="btn-action btn-outline" data-action="verify" data-value="${esc(tx.tx_ref)}"><i class="fas fa-arrows-rotate"></i> Verify</button>
                         </td>
                     </tr>
                 `;
@@ -441,7 +574,7 @@
     async function verifyTx(tx_ref) {
         try {
             const token = window.getAuthToken();
-            const res = await fetch('/api/v1/payments/verify/' + tx_ref, { headers: { 'Authorization': 'Bearer ' + token } });
+            const res = await fetch('/api/v1/payments/verify/' + encodeURIComponent(tx_ref), { headers: { 'Authorization': 'Bearer ' + token } });
             const data = await res.json();
             alert(`Transaction ${tx_ref}\nStatus: ${data.status}\nAmount: ${data.amount_etb} ETB`);
             refreshData();
@@ -483,12 +616,12 @@
             if (!res.ok) throw new Error(data.detail || 'Initialization failed');
 
             resultBox.style.display = 'block';
-            document.getElementById('simResultTx').innerHTML = `<strong>Tx Ref:</strong> <code>${data.tx_ref}</code> (${data.amount_etb} ETB via ${data.app_id})`;
+            document.getElementById('simResultTx').innerHTML = `<strong>Tx Ref:</strong> <code>${esc(data.tx_ref)}</code> (${esc(data.amount_etb)} ETB via ${esc(data.app_id)})`;
             document.getElementById('simCheckoutLink').href = data.checkout_url;
             statusSpan.innerHTML = '<span style="color: #4ade80;"><i class="fas fa-check-circle"></i> Live checkout created</span>';
             refreshData();
         } catch (err) {
-            statusSpan.innerHTML = `<span style="color: #f87171;"><i class="fas fa-circle-exclamation"></i> ${err.message}</span>`;
+            statusSpan.innerHTML = `<span style="color: #f87171;"><i class="fas fa-circle-exclamation"></i> ${esc(err.message)}</span>`;
         } finally {
             btn.disabled = false;
             btn.innerHTML = '<i class="fas fa-play"></i> Initiate via Chapa';

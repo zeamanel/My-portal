@@ -2,6 +2,7 @@ import csv
 import os
 import uuid
 import datetime
+import secrets
 from gcp_client import get_firestore_client, hash_password
 
 def seed_database():
@@ -10,22 +11,26 @@ def seed_database():
 
     # 1. Seed Authorized Users
     users_ref = db.collection("authorized_users")
+    # Passwords are not stored in the repo. Set SEED_ADMIN_PASSWORD to choose
+    # one; otherwise each new user gets a random password printed once here.
     default_users = [
-        {"email": "betcareplc@gmail.com", "role": "admin", "password": "Password123!"},
-        {"email": "xeamanel@gmail.com", "role": "admin", "password": "Password123!"},
+        {"email": "betcareplc@gmail.com", "role": "admin"},
+        {"email": "xeamanel@gmail.com", "role": "admin"},
     ]
     for u in default_users:
         doc_id = u["email"].replace("@", "_at_").replace(".", "_dot_")
         existing = users_ref.document(doc_id).get()
         if not existing.exists:
+            password = os.getenv("SEED_ADMIN_PASSWORD") or secrets.token_urlsafe(16)
             users_ref.document(doc_id).set({
                 "id": str(uuid.uuid4()),
                 "email": u["email"],
                 "role": u["role"],
-                "password_hash": hash_password(u["password"]),
+                "password_hash": hash_password(password),
                 "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
             })
-            print(f"  + Added user: {u['email']} (role: {u['role']})")
+            shown = "(from SEED_ADMIN_PASSWORD)" if os.getenv("SEED_ADMIN_PASSWORD") else f"password: {password}"
+            print(f"  + Added user: {u['email']} (role: {u['role']}) {shown}")
         else:
             print(f"  * User exists: {u['email']}")
 

@@ -15,7 +15,14 @@ import google.auth
 GCP_PROJECT = os.getenv("GCP_PROJECT", "betcare")
 ODA_BRAIN_BUCKET = os.getenv("ODA_BRAIN_BUCKET", "betcare-oda-brain")
 BROCHURES_BUCKET = os.getenv("BROCHURES_BUCKET", "betcare-brochures")
-JWT_SECRET = os.getenv("JWT_SECRET", "odaflux-portal-jwt-secret-2026-key")
+# No fallback. The old hardcoded default is in git history, so anyone could
+# have used it to sign an admin token. Without JWT_SECRET set, no tokens are
+# issued or accepted.
+JWT_SECRET = os.getenv("JWT_SECRET", "")
+
+
+class JWTNotConfigured(RuntimeError):
+    pass
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 
@@ -89,6 +96,8 @@ def verify_password(password: str, hashed: str) -> bool:
 
 def create_access_token(data: dict, expires_delta: Optional[datetime.timedelta] = None) -> str:
     """Create JWT access token."""
+    if not JWT_SECRET:
+        raise JWTNotConfigured("JWT_SECRET is not configured")
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.datetime.now(datetime.timezone.utc) + expires_delta
@@ -99,6 +108,8 @@ def create_access_token(data: dict, expires_delta: Optional[datetime.timedelta] 
 
 def decode_access_token(token: str) -> Optional[dict]:
     """Decode and validate JWT access token."""
+    if not JWT_SECRET:
+        return None
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         return payload
